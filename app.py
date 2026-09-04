@@ -75,18 +75,18 @@ def solicitar():
         data_selecionada = request.form.get('data')
         qtd_selecionada = int(request.form.get('qtd'))
         
-        # Lógica: Busca todas que comportam a quantidade
+        # Busca todas que comportam a quantidade
         todas_que_cabem = Sala.query.filter(Sala.capacidade >= qtd_selecionada).order_by(Sala.capacidade).all()
         
-        # Filtro de "Esconder Sala Grande":
-        # Se houver salas com capacidade de até 2x a quantidade pedida, mostre apenas elas.
-        # Ex: Pediu 10? Mostra as de 15, 20, 25. Esconde a de 100.
+        # LÓGICA DE ESCONDER SALA GRANDE (Auditório):
+        # Se houver salas pequenas que caibam o grupo (até 2.5x o tamanho do grupo),
+        # mostramos apenas as pequenas. Se não houver, liberamos o Auditório.
         salas_ideais = [s for s in todas_que_cabem if s.capacidade <= qtd_selecionada * 2.5]
         
         if salas_ideais:
             salas_disponiveis = salas_ideais
         else:
-            salas_disponiveis = todas_que_cabem # Libera o auditório se for a única opção
+            salas_disponiveis = todas_que_cabem 
 
     return render_template('solicitar.html', salas=salas_disponiveis, data=data_selecionada, qtd=qtd_selecionada)
 
@@ -102,41 +102,60 @@ def confirmar():
     
     data_obj = datetime.strptime(data_str, '%Y-%m-%d').date()
     
-    def salvar(d):
-        nova = Reserva(data=d, hora_inicio=h_inicio, hora_fim=h_fim, qtd_pessoas=qtd, sala_id=sala_id, usuario_id=current_user.id)
+    # Função interna para salvar no banco
+    def salvar_no_banco(data_reserva):
+        nova = Reserva(
+            data=data_reserva, 
+            hora_inicio=h_inicio, 
+            hora_fim=h_fim, 
+            qtd_pessoas=qtd, 
+            sala_id=sala_id, 
+            usuario_id=current_user.id
+        )
         db.session.add(nova)
 
-    salvar(data_obj)
+    # 1. Salva a primeira reserva
+    salvar_no_banco(data_obj)
 
+    # 2. Lógica de Recorrência Inteligente (Ano Atual)
     if recorrente == 'sim':
+        ano_atual = datetime.now().year # Detecta se é 2024, 2025, etc.
         prox_data = data_obj + timedelta(days=7)
-        while prox_data.year == 2024: # Altere para 2025 se necessário
-            salvar(prox_data)
+        
+        while prox_data.year == ano_atual:
+            salvar_no_banco(prox_data)
             prox_data += timedelta(days=7)
 
     db.session.commit()
     
-    msg = f"Olá! Solicitei a reserva da sala no dia {data_str} para {qtd} pessoas."
-    link_zap = f"https://wa.me/5538999999999?text={msg.replace(' ', '%20')}"
+    # Gerar link do WhatsApp para a Secretaria
+    # Troque o número abaixo pelo número real da Paróquia
+    numero_secretaria = "5538999999999" 
+    msg = f"Olá! Fiz um pré-agendamento no App para o dia {data_str}."
+    link_zap = f"https://wa.me/{numero_secretaria}?text={msg.replace(' ', '%20')}"
     
-    flash(f'Pré-agendamento enviado! Clique aqui para avisar no WhatsApp: <a href="{link_zap}" target="_blank">Enviar Mensagem</a>')
+    flash(f'Pré-agendamento enviado com sucesso! <br><br> <a href="{link_zap}" target="_blank" class="btn btn-success">Clique aqui para avisar no WhatsApp da Secretaria</a>', 'info')
     return redirect(url_for('index'))
 
-# --- INICIALIZAÇÃO ---
+# --- INICIALIZAÇÃO DO BANCO E DADOS INICIAIS ---
 def setup_db():
     db.create_all()
+    # Usuário de teste
     if not User.query.filter_by(email='teste@gmail.com').first():
         pw = bcrypt.generate_password_hash('123456').decode('utf-8')
         db.session.add(User(username='Coordenador', email='teste@gmail.com', password=pw))
+    
+    # Salas da Paróquia
     if not Sala.query.first():
         db.session.add_all([
             Sala(nome="Sala 01 (Catequese)", capacidade=15),
             Sala(nome="Sala 02 (Reuniões)", capacidade=30),
-            Sala(nome="Auditório São Judas", capacidade=100)
+            Sala(nome="Auditório São Judas Tadeu", capacidade=100)
         ])
     db.session.commit()
 
 if __name__ == '__main__':
     with app.app_context():
         setup_db()
+    # No Render, ele usará o Gunicorn, mas para testes locais mantemos o run()
     app.run(debug=True, port=5000)
