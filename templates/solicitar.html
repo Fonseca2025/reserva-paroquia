@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card p-4 shadow">
+    <h3>Nova Solicitação</h3>
+    <form method="POST">
+        <div class="row">
+            <div class="col-md-6 mb-2">
+                <label>Data</label>
+                <input type="date" name="data" class="form-control" required>
+            </div>
+            <div class="col-md-6 mb-2">
+                <label>Qtd Pessoas</label>
+                <input type="number" name="qtd" class="form-control" required>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-success mt-2 w-100">Consultar Salas</button>
+    </form>
+
+    {% if salas %}
+    <hr>
+    <form action="/confirmar" method="POST">
+        <input type="hidden" name="data" value="{{ data }}">
+        <input type="hidden" name="qtd" value="{{ qtd }}">
+        
+        <label>Selecione a Sala:</label>
+        {% for s in salas %}
+        <div class="border p-2 mb-2">
+            <input type="radio" name="sala_id" value="{{ s.id }}" required> {{ s.nome }} (Capacidade: {{ s.capacidade }})
+        </div>
+        {% endfor %}
+
+        <div class="row mb-3">
+            <div class="col"><label>Início</label><input type="time" name="h_inicio" class="form-control" required></div>
+            <div class="col"><label>Fim</label><input type="time" name="h_fim" class="form-control" required></div>
+        </div>
+
+        <div class="form-check mb-3">
+            <input type="checkbox" name="recorrente" value="sim" class="form-check-input">
+            <label class="form-check-label">Repetir semanalmente até o fim do ano</label>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Finalizar Pré-agendamento</button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}
