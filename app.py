@@ -6,8 +6,9 @@ from flask_bcrypt import Bcrypt
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'sao-judas-moc-secret'
+app.config['SECRET_KEY'] = 'sao-judas-moc-secret-key-123'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///paroquia.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
@@ -15,6 +16,7 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
 # --- MODELOS DO BANCO DE DADOS ---
+
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), nullable=False)
@@ -41,11 +43,28 @@ class Reserva(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# --- ROTAS ---
+# --- ROTAS DE AUTENTICAÇÃO (CADASTRO E LOGIN) ---
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+@app.route('/cadastro', methods=['GET', 'POST'])
+def cadastro():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        user_exists = User.query.filter_by(email=email).first()
+        if user_exists:
+            flash('Este e-mail já está cadastrado.', 'danger')
+            return redirect(url_for('cadastro'))
+
+        hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+        new_user = User(username=username, email=email, password=hashed_password)
+        db.session.add(new_user)
+        db.session.commit()
+        
+        flash('Conta criada com sucesso! Faça seu login.', 'success')
+        return redirect(url_for('login'))
+    return render_template('cadastro.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -56,13 +75,19 @@ def login():
         if user and bcrypt.check_password_hash(user.password, password):
             login_user(user)
             return redirect(url_for('index'))
-        flash('Login inválido. Tente novamente.')
+        flash('E-mail ou senha incorretos.', 'danger')
     return render_template('login.html')
 
 @app.route('/logout')
 def logout():
     logout_user()
     return redirect(url_for('index'))
+
+# --- ROTAS PRINCIPAIS ---
+
+@app.route('/')
+def index():
+    return render_template('index.html')
 
 @app.route('/solicitar', methods=['GET', 'POST'])
 @login_required
@@ -75,18 +100,18 @@ def solicitar():
         data_selecionada = request.form.get('data')
         qtd_selecionada = int(request.form.get('qtd'))
         
-        # Busca todas que comportam a quantidade
+        # Filtro inicial: Salas que comportam a quantidade
         todas_que_cabem = Sala.query.filter(Sala.capacidade >= qtd_selecionada).order_by(Sala.capacidade).all()
         
-        # LÓGICA DE ESCONDER SALA GRANDE (Auditório):
-        # Se houver salas pequenas que caibam o grupo (até 2.5x o tamanho do grupo),
-        # mostramos apenas as pequenas. Se não houver, liberamos o Auditório.
-        salas_ideais = [s for s in todas_que_cabem if s.capacidade <= qtd_selecionada * 2.5]
+        # Lógica de Esconder Sala Grande:
+        # Se houver salas com capacidade até 2.5x o tamanho do grupo, mostra apenas elas.
+        # Caso contrário (ou se for um grupo grande), mostra as que sobraram.
+        salas_adequadas = [s for s in todas_que_cabem if s.capacidade <= qtd_selecionada * 2.5]
         
-        if salas_ideais:
-            salas_disponiveis = salas_ideais
+        if salas_adequadas:
+            salas_disponiveis = salas_adequadas
         else:
-            salas_disponiveis = todas_que_cabem 
+            salas_disponiveis = todas_que_cabem
 
     return render_template('solicitar.html', salas=salas_disponiveis, data=data_selecionada, qtd=qtd_selecionada)
 
@@ -102,60 +127,53 @@ def confirmar():
     
     data_obj = datetime.strptime(data_str, '%Y-%m-%d').date()
     
-    # Função interna para salvar no banco
-    def salvar_no_banco(data_reserva):
+    def salvar_reserva(data_r):
         nova = Reserva(
-            data=data_reserva, 
-            hora_inicio=h_inicio, 
-            hora_fim=h_fim, 
-            qtd_pessoas=qtd, 
-            sala_id=sala_id, 
-            usuario_id=current_user.id
+            data=data_r, hora_inicio=h_inicio, hora_fim=h_fim, 
+            qtd_pessoas=qtd, sala_id=sala_id, usuario_id=current_user.id
         )
         db.session.add(nova)
 
-    # 1. Salva a primeira reserva
-    salvar_no_banco(data_obj)
+    # Salva a reserva principal
+    salvar_reserva(data_obj)
 
-    # 2. Lógica de Recorrência Inteligente (Ano Atual)
+    # Lógica de Recorrência Inteligente
     if recorrente == 'sim':
-        ano_atual = datetime.now().year # Detecta se é 2024, 2025, etc.
+        ano_atual = datetime.now().year
         prox_data = data_obj + timedelta(days=7)
-        
         while prox_data.year == ano_atual:
-            salvar_no_banco(prox_data)
+            salvar_reserva(prox_data)
             prox_data += timedelta(days=7)
 
     db.session.commit()
     
-    # Gerar link do WhatsApp para a Secretaria
-    # Troque o número abaixo pelo número real da Paróquia
+    # Link do WhatsApp da Secretaria (Altere o número abaixo)
     numero_secretaria = "5538999999999" 
-    msg = f"Olá! Fiz um pré-agendamento no App para o dia {data_str}."
+    msg = f"Olá, aqui é {current_user.username}. Fiz um pré-agendamento para o dia {data_str} via App."
     link_zap = f"https://wa.me/{numero_secretaria}?text={msg.replace(' ', '%20')}"
     
-    flash(f'Pré-agendamento enviado com sucesso! <br><br> <a href="{link_zap}" target="_blank" class="btn btn-success">Clique aqui para avisar no WhatsApp da Secretaria</a>', 'info')
+    flash(f'Solicitação enviada! <br><br> <a href="{link_zap}" target="_blank" class="btn btn-success">Clique aqui para avisar no WhatsApp</a>', 'info')
     return redirect(url_for('index'))
 
-# --- INICIALIZAÇÃO DO BANCO E DADOS INICIAIS ---
+# --- INICIALIZAÇÃO DO SISTEMA ---
+
 def setup_db():
     db.create_all()
-    # Usuário de teste
+    # Cria usuário de teste
     if not User.query.filter_by(email='teste@gmail.com').first():
         pw = bcrypt.generate_password_hash('123456').decode('utf-8')
-        db.session.add(User(username='Coordenador', email='teste@gmail.com', password=pw))
+        db.session.add(User(username='Coordenador Teste', email='teste@gmail.com', password=pw))
     
-    # Salas da Paróquia
+    # Cria as salas da paróquia
     if not Sala.query.first():
         db.session.add_all([
-            Sala(nome="Sala 01 (Catequese)", capacidade=15),
-            Sala(nome="Sala 02 (Reuniões)", capacidade=30),
-            Sala(nome="Auditório São Judas Tadeu", capacidade=100)
+            Sala(nome="Sala Catequese 01", capacidade=15),
+            Sala(nome="Sala Reuniões 02", capacidade=30),
+            Sala(nome="Auditório São Judas", capacidade=100)
         ])
     db.session.commit()
 
 if __name__ == '__main__':
     with app.app_context():
         setup_db()
-    # No Render, ele usará o Gunicorn, mas para testes locais mantemos o run()
-    app.run(debug=True, port=5000)
+    app.run(debug=True)
