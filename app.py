@@ -7,11 +7,11 @@ from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'sao-judas-moc-secret-key-final'
-# Configuração do Banco de Dados Dinâmico
+
+# Configuração do Banco de Dados Dinâmico (Postgres ou SQLite)
 uri = os.getenv("DATABASE_URL")
 if uri and uri.startswith("postgres://"):
     uri = uri.replace("postgres://", "postgresql://", 1)
-
 app.config['SQLALCHEMY_DATABASE_URI'] = uri or 'sqlite:///paroquia.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -20,22 +20,19 @@ bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-# --- MODELOS DO BANCO DE DADOS ---
+# --- MODELOS ---
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), nullable=False)
     email = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(100), nullable=False)
-    # Relacionamento para ver as reservas do usuário
-    reservas = db.relationship('Reserva', backref='usuario', lazy=True)
+    is_admin = db.Column(db.Boolean, default=False) # NOVO: Campo de Admin
 
 class Sala(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(50), nullable=False)
     capacidade = db.Column(db.Integer, nullable=False)
-    # Relacionamento para ver as reservas da sala
-    reservas = db.relationship('Reserva', backref='sala', lazy=True)
 
 class Reserva(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -43,15 +40,22 @@ class Reserva(db.Model):
     hora_inicio = db.Column(db.String(5), nullable=False)
     hora_fim = db.Column(db.String(5), nullable=False)
     qtd_pessoas = db.Column(db.Integer, nullable=False)
-    status = db.Column(db.String(20), default='Pendente') # Pendente ou Aprovado
+    status = db.Column(db.String(20), default='Pendente')
     usuario_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     sala_id = db.Column(db.Integer, db.ForeignKey('sala.id'), nullable=False)
+    
+    usuario = db.relationship('User', backref='reservas')
+    sala = db.relationship('Sala', backref='reservas')
 
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# --- ROTAS DE AUTENTICAÇÃO ---
+# --- ROTAS ---
+
+@app.route('/')
+def index():
+    return render_template('index.html')
 
 @app.route('/cadastro', methods=['GET', 'POST'])
 def cadastro():
@@ -64,12 +68,12 @@ def cadastro():
             flash('Este e-mail já está cadastrado.', 'danger')
             return redirect(url_for('cadastro'))
 
-        hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
-        new_user = User(username=username, email=email, password=hashed_password)
+        hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
+        new_user = User(username=username, email=email, password=hashed_pw, is_admin=False)
         db.session.add(new_user)
         db.session.commit()
         
-        flash('Conta criada com sucesso! Faça seu login.', 'success')
+        flash('Conta criada! Faça seu login.', 'success')
         return redirect(url_for('login'))
     return render_template('cadastro.html')
 
@@ -90,37 +94,24 @@ def logout():
     logout_user()
     return redirect(url_for('index'))
 
-# --- ROTAS DO SISTEMA DE RESERVAS ---
-
-@app.route('/')
-def index():
-    return render_template('index.html')
-
 @app.route('/solicitar', methods=['GET', 'POST'])
 @login_required
 def solicitar():
     salas_disponiveis = None
-    data_selecionada = None
-    qtd_selecionada = None
+    data_sel = None
+    qtd_sel = None
 
     if request.method == 'POST':
-        data_selecionada = request.form.get('data')
-        qtd_selecionada = int(request.form.get('qtd'))
+        data_sel = request.form.get('data')
+        qtd_sel = int(request.form.get('qtd'))
         
-        # 1. Filtra salas que suportam a quantidade
-        todas_que_cabem = Sala.query.filter(Sala.capacidade >= qtd_selecionada).order_by(Sala.capacidade).all()
-        
-        # 2. Lógica de Esconder Sala Grande (Auditório)
-        # Se houver salas pequenas que caibam o grupo (até 2.5x o tamanho do grupo),
-        # mostramos apenas as pequenas. Ex: 10 pessoas não vêem o auditório de 100.
-        salas_adequadas = [s for s in todas_que_cabem if s.capacidade <= qtd_selecionada * 2.5]
-        
-        if salas_adequadas:
-            salas_disponiveis = salas_adequadas
-        else:
-            salas_disponiveis = todas_que_cabem # Libera salas maiores se não houver opção pequena
+        todas = Sala.query.filter(Sala.capacidade >= qtd_sel).order_by(Sala.capacidade).all()
+        # Regra de esconder Auditório para grupos pequenos
+        salas_disponiveis = [s for s in todas if s.capacidade <= qtd_sel * 2.5]
+        if not salas_disponiveis:
+            salas_disponiveis = todas
 
-    return render_template('solicitar.html', salas=salas_disponiveis, data=data_selecionada, qtd=qtd_selecionada)
+    return render_template('solicitar.html', salas=salas_disponiveis, data=data_sel, qtd=qtd_sel)
 
 @app.route('/confirmar', methods=['POST'])
 @login_required
@@ -128,68 +119,61 @@ def confirmar():
     sala_id = request.form.get('sala_id')
     data_str = request.form.get('data')
     qtd = request.form.get('qtd')
-    h_inicio = request.form.get('h_inicio')
+    h_ini = request.form.get('h_inicio')
     h_fim = request.form.get('h_fim')
     recorrente = request.form.get('recorrente')
     
     data_obj = datetime.strptime(data_str, '%Y-%m-%d').date()
     
-    def criar_entrada(data_r):
-        nova = Reserva(
-            data=data_r, hora_inicio=h_inicio, hora_fim=h_fim, 
-            qtd_pessoas=qtd, sala_id=sala_id, usuario_id=current_user.id
-        )
+    def salvar(d):
+        nova = Reserva(data=d, hora_inicio=h_ini, hora_fim=h_fim, qtd_pessoas=qtd, sala_id=sala_id, usuario_id=current_user.id)
         db.session.add(nova)
 
-    # Reserva inicial
-    criar_entrada(data_obj)
-
-    # Recorrência semanal até o fim do ano vigente
+    salvar(data_obj)
     if recorrente == 'sim':
-        ano_atual = datetime.now().year
-        prox_data = data_obj + timedelta(days=7)
-        while prox_data.year == ano_atual:
-            criar_entrada(prox_data)
-            prox_data += timedelta(days=7)
+        ano = datetime.now().year
+        prox = data_obj + timedelta(days=7)
+        while prox.year == ano:
+            salvar(prox)
+            prox += timedelta(days=7)
 
     db.session.commit()
-    
-    # Gerar link do WhatsApp para a Secretaria (Altere o número abaixo para o real)
-    numero_secretaria = "5538999999999" 
-    msg = f"Olá! Fiz um pré-agendamento no App para o dia {data_str} (Sala: {sala_id}). Aguardo aprovação."
-    link_zap = f"https://wa.me/{numero_secretaria}?text={msg.replace(' ', '%20')}"
-    
-    flash(f'Solicitação enviada com sucesso! <br><br> <a href="{link_zap}" target="_blank" class="btn btn-success">Avisar Secretaria no WhatsApp</a>', 'info')
+    num_secretaria = "5538999999999" 
+    msg = f"Olá, aqui é {current_user.username}. Fiz uma reserva para o dia {data_str}."
+    link = f"https://wa.me/{num_secretaria}?text={msg.replace(' ', '%20')}"
+    flash(f'Enviado! <a href="{link}" target="_blank" class="btn btn-success btn-sm">Avisar no WhatsApp</a>', 'info')
     return redirect(url_for('index'))
-
-# --- ROTAS ADMINISTRATIVAS ---
 
 @app.route('/admin')
 @login_required
 def admin():
-    # Lista todas as reservas ordenadas pela data mais próxima
+    if not current_user.is_admin:
+        flash('Acesso negado! Apenas administradores podem ver esta página.', 'danger')
+        return redirect(url_for('index'))
     reservas = Reserva.query.order_by(Reserva.data.asc()).all()
     return render_template('admin.html', reservas=reservas)
 
 @app.route('/aprovar/<int:id>', methods=['POST'])
 @login_required
 def aprovar_reserva(id):
+    if not current_user.is_admin:
+        return redirect(url_for('index'))
     reserva = Reserva.query.get_or_404(id)
     reserva.status = 'Aprovado'
     db.session.commit()
-    flash(f'Reserva de {reserva.usuario.username} aprovada!', 'success')
+    flash(f'Reserva aprovada!', 'success')
     return redirect(url_for('admin'))
 
-# --- INICIALIZAÇÃO DO BANCO ---
+# --- INICIALIZAÇÃO ---
 
 def setup_db():
     db.create_all()
-    # Usuário de teste inicial
-    if not User.query.filter_by(email='teste@gmail.com').first():
-        pw = bcrypt.generate_password_hash('123456').decode('utf-8')
-        db.session.add(User(username='Coordenador Teste', email='teste@gmail.com', password=pw))
+    # Criar Admin de Teste
+    if not User.query.filter_by(email='admin@paroquia.com').first():
+        pw = bcrypt.generate_password_hash('saojudas2024').decode('utf-8')
+        admin_user = User(username='Secretaria SJT', email='admin@paroquia.com', password=pw, is_admin=True)
+        db.session.add(admin_user)
     
-    # Salas iniciais da paróquia
     if not Sala.query.first():
         db.session.add_all([
             Sala(nome="Sala Catequese 01", capacidade=15),
