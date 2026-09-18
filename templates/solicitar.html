@@ -1,45 +1,242 @@
 {% extends "base.html" %}
+
 {% block content %}
+
 <div class="card p-4 shadow">
-    <h3>Nova Solicitação</h3>
+
+    <h3 class="mb-4">Nova Solicitação de Reserva</h3>
+
     <form method="POST">
+
+        <!-- DATA E QUANTIDADE -->
+
         <div class="row">
-            <div class="col-md-6 mb-2">
-                <label>Data</label>
-                <input type="date" name="data" class="form-control" required>
+
+            <div class="col-md-6 mb-3">
+
+                <label class="form-label">
+                    Data
+                </label>
+
+                <input
+                    type="date"
+                    name="data"
+                    class="form-control"
+                    min="{{ now().strftime('%Y-%m-%d') if now is defined else '' }}"
+                    required
+                >
+
             </div>
-            <div class="col-md-6 mb-2">
-                <label>Qtd Pessoas</label>
-                <input type="number" name="qtd" class="form-control" required>
+
+            <div class="col-md-6 mb-3">
+
+                <label class="form-label">
+                    Quantidade de pessoas
+                </label>
+
+                <input
+                    type="number"
+                    name="qtd"
+                    class="form-control"
+                    min="1"
+                    required
+                >
+
             </div>
+
         </div>
-        <button type="submit" class="btn btn-success mt-2 w-100">Consultar Salas</button>
+
+
+        <button
+            type="submit"
+            class="btn btn-success mt-1 w-100"
+        >
+            Consultar Salas
+        </button>
+
     </form>
+
 
     {% if salas %}
-    <hr>
-    <form action="/confirmar" method="POST">
-        <input type="hidden" name="data" value="{{ data }}">
-        <input type="hidden" name="qtd" value="{{ qtd }}">
-        
-        <label>Selecione a Sala:</label>
-        {% for s in salas %}
-        <div class="border p-2 mb-2">
-            <input type="radio" name="sala_id" value="{{ s.id }}" required> {{ s.nome }} (Capacidade: {{ s.capacidade }})
+
+    <hr class="my-4">
+
+    <form
+        action="{{ url_for('confirmar') }}"
+        method="POST"
+    >
+
+        <input
+            type="hidden"
+            name="data"
+            value="{{ data }}"
+        >
+
+        <input
+            type="hidden"
+            name="qtd"
+            value="{{ qtd }}"
+        >
+
+
+        <!-- SALAS -->
+
+        <div class="mb-3">
+
+            <label class="form-label fw-bold">
+                Selecione a sala
+            </label>
+
+            {% for s in salas %}
+
+            <div class="border rounded p-3 mb-2">
+
+                <div class="form-check">
+
+                    <input
+                        class="form-check-input"
+                        type="radio"
+                        name="sala_id"
+                        value="{{ s.id }}"
+                        id="sala{{ s.id }}"
+                        required
+                    >
+
+                    <label
+                        class="form-check-label"
+                        for="sala{{ s.id }}"
+                    >
+
+                        <strong>
+                            {{ s.nome }}
+                        </strong>
+
+                        <br>
+
+                        <small class="text-muted">
+                            Capacidade: {{ s.capacidade }} pessoas
+                        </small>
+
+                    </label>
+
+                </div>
+
+            </div>
+
+            {% endfor %}
+
         </div>
-        {% endfor %}
+
+
+        <!-- HORÁRIOS -->
 
         <div class="row mb-3">
-            <div class="col"><label>Início</label><input type="time" name="h_inicio" class="form-control" required></div>
-            <div class="col"><label>Fim</label><input type="time" name="h_fim" class="form-control" required></div>
+
+            <div class="col-md-6 mb-2">
+
+                <label class="form-label">
+                    Horário de início
+                </label>
+
+                <input
+                    type="time"
+                    name="h_inicio"
+                    class="form-control"
+                    max="21:59"
+                    required
+                >
+
+            </div>
+
+            <div class="col-md-6 mb-2">
+
+                <label class="form-label">
+                    Horário de término
+                </label>
+
+                <input
+                    type="time"
+                    name="h_fim"
+                    class="form-control"
+                    max="22:00"
+                    required
+                >
+
+            </div>
+
         </div>
 
-        <div class="form-check mb-3">
-            <input type="checkbox" name="recorrente" value="sim" class="form-check-input">
-            <label class="form-check-label">Repetir semanalmente até o fim do ano</label>
+        <div class="form-text mb-3">
+            O funcionamento das salas encerra-se às 22h.
         </div>
-        <button type="submit" class="btn btn-primary w-100">Finalizar Pré-agendamento</button>
+
+
+        <!-- OBSERVAÇÃO -->
+
+        <div class="mb-3">
+
+            <label
+                for="observacao"
+                class="form-label"
+            >
+                Observação
+                <span class="text-muted">
+                    (opcional)
+                </span>
+            </label>
+
+            <textarea
+                name="observacao"
+                id="observacao"
+                class="form-control"
+                rows="3"
+                maxlength="1000"
+                placeholder="Informe alguma necessidade ou informação importante para a Secretaria."
+            ></textarea>
+
+            <div class="form-text">
+                Ex.: necessidade de projetor, disposição das cadeiras,
+                acesso antecipado à sala etc.
+            </div>
+
+        </div>
+
+
+        <!-- RECORRÊNCIA -->
+
+        <div class="form-check mb-3">
+
+            <input
+                type="checkbox"
+                name="recorrente"
+                value="sim"
+                class="form-check-input"
+                id="recorrente"
+            >
+
+            <label
+                class="form-check-label"
+                for="recorrente"
+            >
+                Repetir semanalmente até o fim do ano
+            </label>
+
+        </div>
+
+
+        <!-- BOTÃO -->
+
+        <button
+            type="submit"
+            class="btn btn-primary w-100"
+        >
+            Finalizar Pré-agendamento
+        </button>
+
     </form>
+
     {% endif %}
+
 </div>
+
 {% endblock %}
