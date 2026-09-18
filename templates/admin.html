@@ -75,9 +75,7 @@
 
                             {% if reserva.observacao %}
 
-                            <span
-                                title="{{ reserva.observacao }}"
-                            >
+                            <span title="{{ reserva.observacao }}">
                                 {{ reserva.observacao[:60] }}
 
                                 {% if reserva.observacao|length > 60 %}
