@@ -27,15 +27,12 @@ app.config["SECRET_KEY"] = os.environ.get(
     "chave-temporaria-sao-judas"
 )
 
-# Utiliza a DATABASE_URL existente no Render.
-# Se ela não existir, utiliza SQLite apenas para desenvolvimento local.
 database_url = os.environ.get(
     "DATABASE_URL",
     "sqlite:///paroquia.db"
 )
 
-# Alguns ambientes fornecem postgres://.
-# O SQLAlchemy atual utiliza postgresql://.
+# Compatibilidade com URLs antigas do PostgreSQL
 if database_url.startswith("postgres://"):
     database_url = database_url.replace(
         "postgres://",
@@ -147,6 +144,12 @@ class Reserva(db.Model):
         nullable=False
     )
 
+    # Observação opcional do solicitante
+    observacao = db.Column(
+        db.Text,
+        nullable=True
+    )
+
     status = db.Column(
         db.String(20),
         default="Pendente",
@@ -213,7 +216,10 @@ def admin_required(f):
 def cadastro():
 
     if current_user.is_authenticated:
-        return redirect(url_for("index"))
+
+        return redirect(
+            url_for("index")
+        )
 
     if request.method == "POST":
 
@@ -269,7 +275,10 @@ def cadastro():
             is_admin=False
         )
 
-        db.session.add(novo_usuario)
+        db.session.add(
+            novo_usuario
+        )
+
         db.session.commit()
 
         flash(
@@ -294,7 +303,10 @@ def cadastro():
 def login():
 
     if current_user.is_authenticated:
-        return redirect(url_for("index"))
+
+        return redirect(
+            url_for("index")
+        )
 
     if request.method == "POST":
 
@@ -317,7 +329,9 @@ def login():
             password
         ):
 
-            login_user(usuario)
+            login_user(
+                usuario
+            )
 
             return redirect(
                 url_for("index")
@@ -417,10 +431,10 @@ def solicitar():
 
         try:
 
-            datetime.strptime(
+            data_obj = datetime.strptime(
                 data_selecionada,
                 "%Y-%m-%d"
-            )
+            ).date()
 
         except (TypeError, ValueError):
 
@@ -433,6 +447,22 @@ def solicitar():
                 url_for("solicitar")
             )
 
+        # Não permitir datas anteriores ao dia atual
+        if data_obj < datetime.now().date():
+
+            flash(
+                "Não é possível solicitar uma reserva para uma data passada.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("solicitar")
+            )
+
+        # ----------------------------------------------------
+        # Salas que comportam a quantidade de pessoas
+        # ----------------------------------------------------
+
         todas_que_cabem = (
             Sala.query
             .filter(
@@ -443,6 +473,11 @@ def solicitar():
             )
             .all()
         )
+
+        # ----------------------------------------------------
+        # Evita mostrar salas muito maiores quando existe
+        # uma opção mais adequada ao tamanho do grupo.
+        # ----------------------------------------------------
 
         salas_adequadas = [
             sala
@@ -464,6 +499,64 @@ def solicitar():
         data=data_selecionada,
         qtd=qtd_selecionada
     )
+
+
+# ============================================================
+# VERIFICAÇÃO DE CONFLITO
+# ============================================================
+
+def existe_conflito(
+    sala_id,
+    data_obj,
+    h_inicio,
+    h_fim
+):
+    """
+    Verifica se existe uma reserva pendente ou aprovada
+    que se sobreponha ao horário solicitado.
+    """
+
+    reservas = (
+        Reserva.query
+        .filter(
+            Reserva.sala_id == sala_id,
+            Reserva.data == data_obj,
+            Reserva.status.in_(["Pendente", "Aprovado"])
+        )
+        .all()
+    )
+
+    novo_inicio = datetime.strptime(
+        h_inicio,
+        "%H:%M"
+    ).time()
+
+    novo_fim = datetime.strptime(
+        h_fim,
+        "%H:%M"
+    ).time()
+
+    for reserva in reservas:
+
+        inicio_existente = datetime.strptime(
+            reserva.hora_inicio,
+            "%H:%M"
+        ).time()
+
+        fim_existente = datetime.strptime(
+            reserva.hora_fim,
+            "%H:%M"
+        ).time()
+
+        # Há conflito quando os intervalos se sobrepõem.
+        if (
+            inicio_existente < novo_fim
+            and fim_existente > novo_inicio
+        ):
+
+            return reserva
+
+    return None
 
 
 # ============================================================
@@ -494,9 +587,18 @@ def confirmar():
         "h_fim"
     )
 
+    observacao = request.form.get(
+        "observacao",
+        ""
+    ).strip()
+
     recorrente = request.form.get(
         "recorrente"
     )
+
+    # --------------------------------------------------------
+    # Sala
+    # --------------------------------------------------------
 
     sala = db.session.get(
         Sala,
@@ -513,6 +615,10 @@ def confirmar():
         return redirect(
             url_for("solicitar")
         )
+
+    # --------------------------------------------------------
+    # Data
+    # --------------------------------------------------------
 
     try:
 
@@ -531,6 +637,21 @@ def confirmar():
         return redirect(
             url_for("solicitar")
         )
+
+    if data_obj < datetime.now().date():
+
+        flash(
+            "Não é possível solicitar uma reserva para uma data passada.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("solicitar")
+        )
+
+    # --------------------------------------------------------
+    # Quantidade
+    # --------------------------------------------------------
 
     try:
 
@@ -571,6 +692,10 @@ def confirmar():
             url_for("solicitar")
         )
 
+    # --------------------------------------------------------
+    # Horários
+    # --------------------------------------------------------
+
     if not h_inicio or not h_fim:
 
         flash(
@@ -605,6 +730,7 @@ def confirmar():
             url_for("solicitar")
         )
 
+    # O horário final deve ser posterior ao inicial.
     if fim <= inicio:
 
         flash(
@@ -616,25 +742,45 @@ def confirmar():
             url_for("solicitar")
         )
 
-    def criar_entrada(data_r):
+    # --------------------------------------------------------
+    # Limite de funcionamento: 22h
+    # --------------------------------------------------------
 
-        nova_reserva = Reserva(
-            data=data_r,
-            hora_inicio=h_inicio,
-            hora_fim=h_fim,
-            qtd_pessoas=qtd,
-            sala_id=sala.id,
-            usuario_id=current_user.id,
-            status="Pendente"
-        )
-
-        db.session.add(
-            nova_reserva
-        )
-
-    criar_entrada(
-        data_obj
+    limite = datetime.strptime(
+        "22:00",
+        "%H:%M"
     )
+
+    if inicio >= limite:
+
+        flash(
+            "As reservas devem terminar até as 22h. "
+            "O horário de início deve ser anterior às 22h.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("solicitar")
+        )
+
+    if fim > limite:
+
+        flash(
+            "O horário de término não pode ultrapassar as 22h.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("solicitar")
+        )
+
+    # --------------------------------------------------------
+    # Verificar todas as datas antes de criar qualquer reserva
+    # --------------------------------------------------------
+
+    datas_reserva = [
+        data_obj
+    ]
 
     if recorrente == "sim":
 
@@ -646,7 +792,7 @@ def confirmar():
 
         while prox_data.year == ano_atual:
 
-            criar_entrada(
+            datas_reserva.append(
                 prox_data
             )
 
@@ -654,7 +800,64 @@ def confirmar():
                 days=7
             )
 
+    # --------------------------------------------------------
+    # Verifica conflitos
+    # --------------------------------------------------------
+
+    for data_reserva in datas_reserva:
+
+        conflito = existe_conflito(
+            sala.id,
+            data_reserva,
+            h_inicio,
+            h_fim
+        )
+
+        if conflito:
+
+            data_formatada = data_reserva.strftime(
+                "%d/%m/%Y"
+            )
+
+            flash(
+                f"A sala {sala.nome} não está disponível "
+                f"em {data_formatada}, das "
+                f"{conflito.hora_inicio} às "
+                f"{conflito.hora_fim}. "
+                f"Escolha outro horário ou outra sala.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("solicitar")
+            )
+
+    # --------------------------------------------------------
+    # Criar as reservas
+    # --------------------------------------------------------
+
+    for data_reserva in datas_reserva:
+
+        nova_reserva = Reserva(
+            data=data_reserva,
+            hora_inicio=h_inicio,
+            hora_fim=h_fim,
+            qtd_pessoas=qtd,
+            observacao=observacao if observacao else None,
+            sala_id=sala.id,
+            usuario_id=current_user.id,
+            status="Pendente"
+        )
+
+        db.session.add(
+            nova_reserva
+        )
+
     db.session.commit()
+
+    # --------------------------------------------------------
+    # WhatsApp da Secretaria
+    # --------------------------------------------------------
 
     numero_secretaria = os.environ.get(
         "WHATSAPP_SECRETARIA",
@@ -668,8 +871,23 @@ def confirmar():
         f"Data: {data_obj.strftime('%d/%m/%Y')}\n"
         f"Horário: {h_inicio} às {h_fim}\n"
         f"Sala: {sala.nome}\n"
-        f"Quantidade de pessoas: {qtd}\n\n"
-        "Aguardo a aprovação da Secretaria."
+        f"Quantidade de pessoas: {qtd}\n"
+    )
+
+    if observacao:
+
+        mensagem += (
+            f"Observação: {observacao}\n"
+        )
+
+    if recorrente == "sim":
+
+        mensagem += (
+            "Recorrência: semanal até o final do ano.\n"
+        )
+
+    mensagem += (
+        "\nAguardo a aprovação da Secretaria."
     )
 
     link_zap = (
@@ -742,6 +960,27 @@ def aprovar_reserva(id):
             url_for("admin")
         )
 
+    # Antes de aprovar, verifica novamente se não surgiu
+    # outra reserva conflitante.
+    conflito = existe_conflito(
+        reserva.sala_id,
+        reserva.data,
+        reserva.hora_inicio,
+        reserva.hora_fim
+    )
+
+    if conflito and conflito.id != reserva.id:
+
+        flash(
+            "Não foi possível aprovar esta reserva porque "
+            "existe outra reserva no mesmo horário.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("admin")
+        )
+
     reserva.status = "Aprovado"
 
     db.session.commit()
@@ -760,14 +999,64 @@ def aprovar_reserva(id):
 # PREPARAÇÃO DO BANCO
 # ============================================================
 
+def atualizar_estrutura_banco():
+
+    """
+    Atualiza pequenas alterações estruturais no PostgreSQL
+    existente sem apagar os dados.
+    """
+
+    inspector = db.inspect(
+        db.engine
+    )
+
+    tabelas = inspector.get_table_names()
+
+    # Se a tabela ainda não existir, db.create_all()
+    # será responsável por criá-la.
+    if "reserva" not in tabelas:
+
+        return
+
+    colunas_reserva = [
+        coluna["name"]
+        for coluna in inspector.get_columns("reserva")
+    ]
+
+    # Adiciona a coluna observacao aos bancos existentes.
+    if "observacao" not in colunas_reserva:
+
+        print(
+            "Atualizando banco: adicionando coluna observacao..."
+        )
+
+        with db.engine.begin() as connection:
+
+            connection.exec_driver_sql(
+                "ALTER TABLE reserva "
+                "ADD COLUMN observacao TEXT"
+            )
+
+        print(
+            "Coluna observacao adicionada com sucesso."
+        )
+
+
 def setup_db():
 
-    print("Iniciando configuração do banco de dados...")
+    print(
+        "Iniciando configuração do banco de dados..."
+    )
 
-    # Cria todas as tabelas que ainda não existem.
+    # Cria as tabelas caso ainda não existam.
     db.create_all()
 
-    print("Tabelas verificadas/criadas com sucesso.")
+    # Atualiza a estrutura das tabelas existentes.
+    atualizar_estrutura_banco()
+
+    print(
+        "Tabelas verificadas/criadas com sucesso."
+    )
 
     # --------------------------------------------------------
     # Administrador inicial
