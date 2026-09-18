@@ -1,47 +1,176 @@
 {% extends "base.html" %}
+
 {% block content %}
+
 <div class="card shadow">
+
     <div class="card-header d-flex justify-content-between align-items-center">
-        <h3 class="mb-0">Painel de Aprovação</h3>
-        <span class="badge bg-light text-dark">Total de Pedidos</span>
+
+        <h3 class="mb-0">
+            Painel de Aprovação
+        </h3>
+
+        <span class="badge bg-light text-dark">
+            Total de Pedidos: {{ reservas|length }}
+        </span>
+
     </div>
+
+
     <div class="card-body">
+
+        {% if reservas %}
+
         <div class="table-responsive">
-            <table class="table table-hover">
+
+            <table class="table table-hover align-middle">
+
                 <thead class="table-light">
+
                     <tr>
+
                         <th>Data</th>
+                        <th>Horário</th>
                         <th>Sala</th>
                         <th>Solicitante</th>
                         <th>Pessoas</th>
+                        <th>Observação</th>
                         <th>Status</th>
                         <th>Ações</th>
+
                     </tr>
+
                 </thead>
+
+
                 <tbody>
+
                     {% for reserva in reservas %}
+
                     <tr>
-                        <td>{{ reserva.data.strftime('%d/%m/%Y') }}</td>
-                        <td>{{ reserva.sala.nome }}</td>
-                        <td>{{ reserva.usuario.username }}</td>
-                        <td>{{ reserva.qtd_pessoas }}</td>
+
                         <td>
-                            <span class="badge {% if reserva.status == 'Pendente' %}bg-warning{% else %}bg-success{% endif %}">
+                            {{ reserva.data.strftime('%d/%m/%Y') }}
+                        </td>
+
+                        <td>
+                            {{ reserva.hora_inicio }}
+                            às
+                            {{ reserva.hora_fim }}
+                        </td>
+
+                        <td>
+                            {{ reserva.sala.nome }}
+                        </td>
+
+                        <td>
+                            {{ reserva.usuario.username }}
+                        </td>
+
+                        <td>
+                            {{ reserva.qtd_pessoas }}
+                        </td>
+
+                        <td>
+
+                            {% if reserva.observacao %}
+
+                            <span
+                                title="{{ reserva.observacao }}"
+                            >
+                                {{ reserva.observacao[:60] }}
+
+                                {% if reserva.observacao|length > 60 %}
+                                    ...
+                                {% endif %}
+                            </span>
+
+                            {% else %}
+
+                            <span class="text-muted">
+                                —
+                            </span>
+
+                            {% endif %}
+
+                        </td>
+
+                        <td>
+
+                            {% if reserva.status == 'Pendente' %}
+
+                            <span class="badge bg-warning text-dark">
+                                Pendente
+                            </span>
+
+                            {% elif reserva.status == 'Aprovado' %}
+
+                            <span class="badge bg-success">
+                                Aprovado
+                            </span>
+
+                            {% else %}
+
+                            <span class="badge bg-secondary">
                                 {{ reserva.status }}
                             </span>
-                        </td>
-                        <td>
-                            {% if reserva.status == 'Pendente' %}
-                            <form action="{{ url_for('aprovar_reserva', id=reserva.id) }}" method="POST" style="display:inline;">
-                                <button class="btn btn-sm btn-success">Aprovar</button>
-                            </form>
+
                             {% endif %}
+
                         </td>
+
+                        <td>
+
+                            {% if reserva.status == 'Pendente' %}
+
+                            <form
+                                action="{{ url_for('aprovar_reserva', id=reserva.id) }}"
+                                method="POST"
+                            >
+
+                                <button
+                                    type="submit"
+                                    class="btn btn-sm btn-success"
+                                >
+                                    Aprovar
+                                </button>
+
+                            </form>
+
+                            {% else %}
+
+                            <span class="text-muted">
+                                —
+                            </span>
+
+                            {% endif %}
+
+                        </td>
+
                     </tr>
+
                     {% endfor %}
+
                 </tbody>
+
             </table>
+
         </div>
+
+        {% else %}
+
+        <div class="text-center py-4">
+
+            <p class="text-muted mb-0">
+                Não há solicitações de reserva.
+            </p>
+
+        </div>
+
+        {% endif %}
+
     </div>
+
 </div>
+
 {% endblock %}
