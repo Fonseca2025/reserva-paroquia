@@ -577,9 +577,6 @@ def solicitar():
                     url_for("solicitar")
                 )
 
-            # Mostra salas adequadas à quantidade.
-            # Salas muito maiores que a necessidade
-            # são evitadas quando existem opções menores.
             salas_todas = Sala.query.filter(
                 Sala.capacidade >= qtd_pessoas
             ).order_by(
@@ -949,14 +946,50 @@ def confirmar():
 @admin_required
 def agenda():
 
-    reservas = Reserva.query.order_by(
+    data_str = request.args.get(
+        "data",
+        ""
+    ).strip()
+
+    data_filtro = None
+
+    if data_str:
+
+        try:
+
+            data_filtro = datetime.strptime(
+                data_str,
+                "%Y-%m-%d"
+            ).date()
+
+        except ValueError:
+
+            flash(
+                "Data inválida.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("agenda")
+            )
+
+    consulta = Reserva.query
+
+    if data_filtro:
+
+        consulta = consulta.filter(
+            Reserva.data == data_filtro
+        )
+
+    reservas = consulta.order_by(
         Reserva.data.asc(),
         Reserva.hora_inicio.asc()
     ).all()
 
     return render_template(
         "agenda.html",
-        reservas=reservas
+        reservas=reservas,
+        data_filtro=data_str
     )
 
 
