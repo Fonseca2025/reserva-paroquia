@@ -1,19 +1,28 @@
 import os
 from functools import wraps
-from datetime import datetime, timedelta
+from datetime import datetime, date, timedelta
 from urllib.parse import quote
 
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import (
+    Flask,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    flash
+)
+
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
     LoginManager,
     UserMixin,
     login_user,
-    logout_user,
     login_required,
+    logout_user,
     current_user
 )
 from flask_bcrypt import Bcrypt
+from sqlalchemy import inspect, text
 
 
 # ============================================================
@@ -32,7 +41,7 @@ database_url = os.environ.get(
     "sqlite:///paroquia.db"
 )
 
-# Compatibilidade com URLs antigas do PostgreSQL
+# Compatibilidade com URLs antigas do Render
 if database_url.startswith("postgres://"):
     database_url = database_url.replace(
         "postgres://",
@@ -50,19 +59,14 @@ bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 login_manager.login_message = "Faça login para acessar esta página."
-login_manager.login_message_category = "warning"
 
 
 # ============================================================
 # MODELOS
 # ============================================================
 
-class User(db.Model, UserMixin):
-
-    id = db.Column(
-        db.Integer,
-        primary_key=True
-    )
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
 
     username = db.Column(
         db.String(100),
@@ -94,7 +98,6 @@ class User(db.Model, UserMixin):
 
 
 class Sala(db.Model):
-
     id = db.Column(
         db.Integer,
         primary_key=True
@@ -118,7 +121,6 @@ class Sala(db.Model):
 
 
 class Reserva(db.Model):
-
     id = db.Column(
         db.Integer,
         primary_key=True
@@ -144,7 +146,6 @@ class Reserva(db.Model):
         nullable=False
     )
 
-    # Observação opcional do solicitante
     observacao = db.Column(
         db.Text,
         nullable=True
@@ -175,37 +176,215 @@ class Reserva(db.Model):
 
 @login_manager.user_loader
 def load_user(user_id):
-
-    return db.session.get(
-        User,
-        int(user_id)
-    )
+    return db.session.get(User, int(user_id))
 
 
 # ============================================================
-# PROTEÇÃO ADMINISTRATIVA
+# PROTEÇÃO DE ADMINISTRADOR
 # ============================================================
 
 def admin_required(f):
-
     @wraps(f)
     @login_required
     def decorated_function(*args, **kwargs):
 
         if not current_user.is_admin:
-
             flash(
                 "Acesso restrito à administração da paróquia.",
                 "danger"
             )
-
-            return redirect(
-                url_for("index")
-            )
+            return redirect(url_for("index"))
 
         return f(*args, **kwargs)
 
     return decorated_function
+
+
+# ============================================================
+# VERIFICAÇÃO DE CONFLITO DE HORÁRIO
+# ============================================================
+
+def existe_conflito(
+    sala_id,
+    data_obj,
+    h_inicio,
+    h_fim,
+    reserva_id=None
+):
+    reservas = Reserva.query.filter_by(
+        sala_id=sala_id,
+        data=data_obj
+    ).filter(
+        Reserva.status.in_(["Pendente", "Aprovado"])
+    )
+
+    if reserva_id is not None:
+        reservas = reservas.filter(
+            Reserva.id != reserva_id
+        )
+
+    inicio_novo = datetime.strptime(
+        h_inicio,
+        "%H:%M"
+    ).time()
+
+    fim_novo = datetime.strptime(
+        h_fim,
+        "%H:%M"
+    ).time()
+
+    for reserva in reservas.all():
+
+        inicio_existente = datetime.strptime(
+            reserva.hora_inicio,
+            "%H:%M"
+        ).time()
+
+        fim_existente = datetime.strptime(
+            reserva.hora_fim,
+            "%H:%M"
+        ).time()
+
+        if (
+            inicio_existente < fim_novo
+            and fim_existente > inicio_novo
+        ):
+            return True
+
+    return False
+
+
+# ============================================================
+# BANCO DE DADOS
+# ============================================================
+
+def atualizar_estrutura_banco():
+
+    inspector = inspect(db.engine)
+
+    tabelas = inspector.get_table_names()
+
+    if "reserva" in tabelas:
+
+        colunas = [
+            coluna["name"]
+            for coluna in inspector.get_columns("reserva")
+        ]
+
+        if "observacao" not in colunas:
+
+            with db.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE reserva "
+                        "ADD COLUMN observacao TEXT"
+                    )
+                )
+
+            print(
+                "Coluna observacao adicionada à tabela reserva."
+            )
+
+
+def setup_db():
+
+    print(
+        "Iniciando configuração do banco de dados..."
+    )
+
+    db.create_all()
+
+    atualizar_estrutura_banco()
+
+    # --------------------------------------------------------
+    # ADMINISTRADOR
+    # --------------------------------------------------------
+
+    admin_email = os.environ.get(
+        "ADMIN_EMAIL",
+        "teste@gmail.com"
+    )
+
+    admin_password = os.environ.get(
+        "ADMIN_PASSWORD",
+        "123456"
+    )
+
+    admin = User.query.filter_by(
+        email=admin_email
+    ).first()
+
+    if admin:
+
+        admin.is_admin = True
+
+        db.session.commit()
+
+    else:
+
+        senha_hash = bcrypt.generate_password_hash(
+            admin_password
+        ).decode("utf-8")
+
+        admin = User(
+            username="Administrador",
+            email=admin_email,
+            password=senha_hash,
+            is_admin=True
+        )
+
+        db.session.add(admin)
+        db.session.commit()
+
+        print(
+            f"Administrador criado: {admin_email}"
+        )
+
+    # --------------------------------------------------------
+    # SALAS
+    # --------------------------------------------------------
+
+    if Sala.query.count() == 0:
+
+        salas = [
+            Sala(
+                nome="Sala Catequese 01",
+                capacidade=15
+            ),
+            Sala(
+                nome="Sala Reuniões 02",
+                capacidade=35
+            ),
+            Sala(
+                nome="Auditório São Judas",
+                capacidade=100
+            )
+        ]
+
+        db.session.add_all(salas)
+        db.session.commit()
+
+        print(
+            "Salas iniciais cadastradas."
+        )
+
+    print(
+        "Tabelas verificadas/criadas com sucesso."
+    )
+
+    print(
+        "Configuração do banco concluída."
+    )
+
+
+# ============================================================
+# PÁGINA INICIAL
+# ============================================================
+
+@app.route("/")
+def index():
+
+    return render_template("index.html")
 
 
 # ============================================================
@@ -214,12 +393,6 @@ def admin_required(f):
 
 @app.route("/cadastro", methods=["GET", "POST"])
 def cadastro():
-
-    if current_user.is_authenticated:
-
-        return redirect(
-            url_for("index")
-        )
 
     if request.method == "POST":
 
@@ -268,21 +441,18 @@ def cadastro():
             password
         ).decode("utf-8")
 
-        novo_usuario = User(
+        usuario = User(
             username=username,
             email=email,
             password=senha_hash,
             is_admin=False
         )
 
-        db.session.add(
-            novo_usuario
-        )
-
+        db.session.add(usuario)
         db.session.commit()
 
         flash(
-            "Conta criada com sucesso! Faça seu login.",
+            "Cadastro realizado com sucesso.",
             "success"
         )
 
@@ -290,9 +460,7 @@ def cadastro():
             url_for("login")
         )
 
-    return render_template(
-        "cadastro.html"
-    )
+    return render_template("cadastro.html")
 
 
 # ============================================================
@@ -303,7 +471,6 @@ def cadastro():
 def login():
 
     if current_user.is_authenticated:
-
         return redirect(
             url_for("index")
         )
@@ -320,17 +487,20 @@ def login():
             ""
         )
 
-        usuario = User.query.filter_by(
+        user = User.query.filter_by(
             email=email
         ).first()
 
-        if usuario and bcrypt.check_password_hash(
-            usuario.password,
+        if user and bcrypt.check_password_hash(
+            user.password,
             password
         ):
 
-            login_user(
-                usuario
+            login_user(user)
+
+            flash(
+                "Login realizado com sucesso.",
+                "success"
             )
 
             return redirect(
@@ -342,9 +512,7 @@ def login():
             "danger"
         )
 
-    return render_template(
-        "login.html"
-    )
+    return render_template("login.html")
 
 
 # ============================================================
@@ -359,7 +527,7 @@ def logout():
 
     flash(
         "Você saiu do sistema.",
-        "info"
+        "success"
     )
 
     return redirect(
@@ -368,223 +536,117 @@ def logout():
 
 
 # ============================================================
-# PÁGINA INICIAL
+# SOLICITAÇÃO DE RESERVA
 # ============================================================
 
-@app.route("/")
-def index():
-
-    return render_template(
-        "index.html"
-    )
-
-
-# ============================================================
-# SOLICITAR RESERVA
-# ============================================================
-
-@app.route("/solicitar", methods=["GET", "POST"])
+@app.route("/solicitar", methods=["GET"])
 @login_required
 def solicitar():
 
-    salas_disponiveis = None
-    data_selecionada = None
-    qtd_selecionada = None
+    data_str = request.args.get(
+        "data",
+        ""
+    )
 
-    if request.method == "POST":
+    qtd_str = request.args.get(
+        "qtd_pessoas",
+        ""
+    )
 
-        data_selecionada = request.form.get(
-            "data"
-        )
+    salas = []
 
-        qtd_str = request.form.get(
-            "qtd"
-        )
-
-        try:
-
-            qtd_selecionada = int(
-                qtd_str
-            )
-
-        except (TypeError, ValueError):
-
-            flash(
-                "Informe uma quantidade válida de pessoas.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("solicitar")
-            )
-
-        if qtd_selecionada <= 0:
-
-            flash(
-                "A quantidade de pessoas deve ser maior que zero.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("solicitar")
-            )
+    if data_str and qtd_str:
 
         try:
 
             data_obj = datetime.strptime(
-                data_selecionada,
+                data_str,
                 "%Y-%m-%d"
             ).date()
 
-        except (TypeError, ValueError):
+            qtd_pessoas = int(qtd_str)
+
+            if data_obj < date.today():
+
+                flash(
+                    "Não é possível reservar uma data passada.",
+                    "danger"
+                )
+
+                return redirect(
+                    url_for("solicitar")
+                )
+
+            # Mostra salas adequadas à quantidade.
+            # Salas muito maiores que a necessidade
+            # são evitadas quando existem opções menores.
+            salas_todas = Sala.query.filter(
+                Sala.capacidade >= qtd_pessoas
+            ).order_by(
+                Sala.capacidade.asc()
+            ).all()
+
+            salas_adequadas = [
+                sala
+                for sala in salas_todas
+                if sala.capacidade <= qtd_pessoas * 2.5
+            ]
+
+            if salas_adequadas:
+                salas = salas_adequadas
+            else:
+                salas = salas_todas
+
+        except ValueError:
 
             flash(
-                "Informe uma data válida.",
+                "Data ou quantidade de pessoas inválida.",
                 "danger"
             )
 
             return redirect(
                 url_for("solicitar")
             )
-
-        # Não permitir datas anteriores ao dia atual
-        if data_obj < datetime.now().date():
-
-            flash(
-                "Não é possível solicitar uma reserva para uma data passada.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("solicitar")
-            )
-
-        # ----------------------------------------------------
-        # Salas que comportam a quantidade de pessoas
-        # ----------------------------------------------------
-
-        todas_que_cabem = (
-            Sala.query
-            .filter(
-                Sala.capacidade >= qtd_selecionada
-            )
-            .order_by(
-                Sala.capacidade
-            )
-            .all()
-        )
-
-        # ----------------------------------------------------
-        # Evita mostrar salas muito maiores quando existe
-        # uma opção mais adequada ao tamanho do grupo.
-        # ----------------------------------------------------
-
-        salas_adequadas = [
-            sala
-            for sala in todas_que_cabem
-            if sala.capacidade <= qtd_selecionada * 2.5
-        ]
-
-        if salas_adequadas:
-
-            salas_disponiveis = salas_adequadas
-
-        else:
-
-            salas_disponiveis = todas_que_cabem
 
     return render_template(
         "solicitar.html",
-        salas=salas_disponiveis,
-        data=data_selecionada,
-        qtd=qtd_selecionada
+        salas=salas,
+        data=data_str,
+        qtd_pessoas=qtd_str
     )
 
 
 # ============================================================
-# VERIFICAÇÃO DE CONFLITO
-# ============================================================
-
-def existe_conflito(
-    sala_id,
-    data_obj,
-    h_inicio,
-    h_fim
-):
-    """
-    Verifica se existe uma reserva pendente ou aprovada
-    que se sobreponha ao horário solicitado.
-    """
-
-    reservas = (
-        Reserva.query
-        .filter(
-            Reserva.sala_id == sala_id,
-            Reserva.data == data_obj,
-            Reserva.status.in_(["Pendente", "Aprovado"])
-        )
-        .all()
-    )
-
-    novo_inicio = datetime.strptime(
-        h_inicio,
-        "%H:%M"
-    ).time()
-
-    novo_fim = datetime.strptime(
-        h_fim,
-        "%H:%M"
-    ).time()
-
-    for reserva in reservas:
-
-        inicio_existente = datetime.strptime(
-            reserva.hora_inicio,
-            "%H:%M"
-        ).time()
-
-        fim_existente = datetime.strptime(
-            reserva.hora_fim,
-            "%H:%M"
-        ).time()
-
-        # Há conflito quando os intervalos se sobrepõem.
-        if (
-            inicio_existente < novo_fim
-            and fim_existente > novo_inicio
-        ):
-
-            return reserva
-
-    return None
-
-
-# ============================================================
-# CONFIRMAR RESERVA
+# CONFIRMAÇÃO DA RESERVA
 # ============================================================
 
 @app.route("/confirmar", methods=["POST"])
 @login_required
 def confirmar():
 
-    sala_id = request.form.get(
-        "sala_id"
+    data_str = request.form.get(
+        "data",
+        ""
     )
 
-    data_str = request.form.get(
-        "data"
+    sala_id_str = request.form.get(
+        "sala_id",
+        ""
     )
 
     qtd_str = request.form.get(
-        "qtd"
+        "qtd_pessoas",
+        ""
     )
 
-    h_inicio = request.form.get(
-        "h_inicio"
+    hora_inicio = request.form.get(
+        "hora_inicio",
+        ""
     )
 
-    h_fim = request.form.get(
-        "h_fim"
+    hora_fim = request.form.get(
+        "hora_fim",
+        ""
     )
 
     observacao = request.form.get(
@@ -597,7 +659,130 @@ def confirmar():
     )
 
     # --------------------------------------------------------
-    # Sala
+    # VALIDAÇÃO DOS CAMPOS
+    # --------------------------------------------------------
+
+    if not all([
+        data_str,
+        sala_id_str,
+        qtd_str,
+        hora_inicio,
+        hora_fim
+    ]):
+
+        flash(
+            "Preencha todos os campos obrigatórios.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("solicitar")
+        )
+
+    try:
+
+        data_obj = datetime.strptime(
+            data_str,
+            "%Y-%m-%d"
+        ).date()
+
+        sala_id = int(sala_id_str)
+
+        qtd_pessoas = int(qtd_str)
+
+    except ValueError:
+
+        flash(
+            "Dados inválidos.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("solicitar")
+        )
+
+    # --------------------------------------------------------
+    # DATA
+    # --------------------------------------------------------
+
+    if data_obj < date.today():
+
+        flash(
+            "Não é possível reservar uma data passada.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("solicitar")
+        )
+
+    # --------------------------------------------------------
+    # HORÁRIOS
+    # --------------------------------------------------------
+
+    try:
+
+        inicio = datetime.strptime(
+            hora_inicio,
+            "%H:%M"
+        ).time()
+
+        fim = datetime.strptime(
+            hora_fim,
+            "%H:%M"
+        ).time()
+
+        limite_22h = datetime.strptime(
+            "22:00",
+            "%H:%M"
+        ).time()
+
+    except ValueError:
+
+        flash(
+            "Horário inválido.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("solicitar")
+        )
+
+    if inicio >= fim:
+
+        flash(
+            "O horário final deve ser posterior ao horário inicial.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("solicitar")
+        )
+
+    if inicio >= limite_22h:
+
+        flash(
+            "As reservas devem começar antes das 22h.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("solicitar")
+        )
+
+    if fim > limite_22h:
+
+        flash(
+            "O funcionamento das salas termina às 22h.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("solicitar")
+        )
+
+    # --------------------------------------------------------
+    # SALA
     # --------------------------------------------------------
 
     sala = db.session.get(
@@ -608,7 +793,7 @@ def confirmar():
     if not sala:
 
         flash(
-            "A sala selecionada não foi encontrada.",
+            "Sala não encontrada.",
             "danger"
         )
 
@@ -616,72 +801,7 @@ def confirmar():
             url_for("solicitar")
         )
 
-    # --------------------------------------------------------
-    # Data
-    # --------------------------------------------------------
-
-    try:
-
-        data_obj = datetime.strptime(
-            data_str,
-            "%Y-%m-%d"
-        ).date()
-
-    except (TypeError, ValueError):
-
-        flash(
-            "A data informada é inválida.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("solicitar")
-        )
-
-    if data_obj < datetime.now().date():
-
-        flash(
-            "Não é possível solicitar uma reserva para uma data passada.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("solicitar")
-        )
-
-    # --------------------------------------------------------
-    # Quantidade
-    # --------------------------------------------------------
-
-    try:
-
-        qtd = int(
-            qtd_str
-        )
-
-    except (TypeError, ValueError):
-
-        flash(
-            "A quantidade de pessoas é inválida.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("solicitar")
-        )
-
-    if qtd <= 0:
-
-        flash(
-            "A quantidade de pessoas deve ser maior que zero.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("solicitar")
-        )
-
-    if qtd > sala.capacidade:
+    if qtd_pessoas > sala.capacidade:
 
         flash(
             "A quantidade de pessoas excede a capacidade da sala.",
@@ -693,220 +813,150 @@ def confirmar():
         )
 
     # --------------------------------------------------------
-    # Horários
+    # DATAS DA RESERVA
     # --------------------------------------------------------
 
-    if not h_inicio or not h_fim:
+    datas_reserva = [data_obj]
 
-        flash(
-            "Informe o horário de início e término.",
-            "danger"
+    if recorrente:
+
+        data_atual = data_obj
+
+        ultimo_dia = date(
+            data_obj.year,
+            12,
+            31
         )
 
-        return redirect(
-            url_for("solicitar")
-        )
+        while True:
 
-    try:
+            proxima_data = (
+                data_atual
+                + timedelta(days=7)
+            )
 
-        inicio = datetime.strptime(
-            h_inicio,
-            "%H:%M"
-        )
-
-        fim = datetime.strptime(
-            h_fim,
-            "%H:%M"
-        )
-
-    except ValueError:
-
-        flash(
-            "Informe horários válidos.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("solicitar")
-        )
-
-    # O horário final deve ser posterior ao inicial.
-    if fim <= inicio:
-
-        flash(
-            "O horário de término deve ser posterior ao horário de início.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("solicitar")
-        )
-
-    # --------------------------------------------------------
-    # Limite de funcionamento: 22h
-    # --------------------------------------------------------
-
-    limite = datetime.strptime(
-        "22:00",
-        "%H:%M"
-    )
-
-    if inicio >= limite:
-
-        flash(
-            "As reservas devem terminar até as 22h. "
-            "O horário de início deve ser anterior às 22h.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("solicitar")
-        )
-
-    if fim > limite:
-
-        flash(
-            "O horário de término não pode ultrapassar as 22h.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("solicitar")
-        )
-
-    # --------------------------------------------------------
-    # Verificar todas as datas antes de criar qualquer reserva
-    # --------------------------------------------------------
-
-    datas_reserva = [
-        data_obj
-    ]
-
-    if recorrente == "sim":
-
-        ano_atual = datetime.now().year
-
-        prox_data = data_obj + timedelta(
-            days=7
-        )
-
-        while prox_data.year == ano_atual:
+            if proxima_data > ultimo_dia:
+                break
 
             datas_reserva.append(
-                prox_data
+                proxima_data
             )
 
-            prox_data += timedelta(
-                days=7
-            )
+            data_atual = proxima_data
 
     # --------------------------------------------------------
-    # Verifica conflitos
+    # VERIFICAÇÃO DE CONFLITOS
     # --------------------------------------------------------
 
     for data_reserva in datas_reserva:
 
-        conflito = existe_conflito(
-            sala.id,
+        if existe_conflito(
+            sala_id,
             data_reserva,
-            h_inicio,
-            h_fim
-        )
-
-        if conflito:
-
-            data_formatada = data_reserva.strftime(
-                "%d/%m/%Y"
-            )
+            hora_inicio,
+            hora_fim
+        ):
 
             flash(
-                f"A sala {sala.nome} não está disponível "
-                f"em {data_formatada}, das "
-                f"{conflito.hora_inicio} às "
-                f"{conflito.hora_fim}. "
-                f"Escolha outro horário ou outra sala.",
+                f"Já existe uma reserva para "
+                f"{sala.nome} em "
+                f"{data_reserva.strftime('%d/%m/%Y')} "
+                f"nesse horário.",
                 "danger"
             )
 
             return redirect(
-                url_for("solicitar")
+                url_for(
+                    "solicitar",
+                    data=data_str,
+                    qtd_pessoas=qtd_str
+                )
             )
 
     # --------------------------------------------------------
-    # Criar as reservas
+    # CRIAÇÃO DAS RESERVAS
     # --------------------------------------------------------
 
     for data_reserva in datas_reserva:
 
         nova_reserva = Reserva(
             data=data_reserva,
-            hora_inicio=h_inicio,
-            hora_fim=h_fim,
-            qtd_pessoas=qtd,
-            observacao=observacao if observacao else None,
-            sala_id=sala.id,
+            hora_inicio=hora_inicio,
+            hora_fim=hora_fim,
+            qtd_pessoas=qtd_pessoas,
+            observacao=observacao or None,
+            status="Pendente",
             usuario_id=current_user.id,
-            status="Pendente"
+            sala_id=sala_id
         )
 
-        db.session.add(
-            nova_reserva
-        )
+        db.session.add(nova_reserva)
 
     db.session.commit()
 
     # --------------------------------------------------------
-    # WhatsApp da Secretaria
+    # LINK PARA WHATSAPP DA SECRETARIA
     # --------------------------------------------------------
 
-    numero_secretaria = os.environ.get(
+    numero_whatsapp = os.environ.get(
         "WHATSAPP_SECRETARIA",
         "5538999999999"
     )
 
     mensagem = (
-        "Olá! Fiz um pré-agendamento no "
-        "Sistema de Reservas da Paróquia São Judas Tadeu.\n\n"
+        "Nova solicitação de reserva de sala.\n\n"
         f"Solicitante: {current_user.username}\n"
         f"Data: {data_obj.strftime('%d/%m/%Y')}\n"
-        f"Horário: {h_inicio} às {h_fim}\n"
+        f"Horário: {hora_inicio} às {hora_fim}\n"
         f"Sala: {sala.nome}\n"
-        f"Quantidade de pessoas: {qtd}\n"
+        f"Pessoas: {qtd_pessoas}\n"
     )
 
     if observacao:
-
         mensagem += (
             f"Observação: {observacao}\n"
         )
 
-    if recorrente == "sim":
-
+    if recorrente:
         mensagem += (
-            "Recorrência: semanal até o final do ano.\n"
+            "Reserva semanal até o final do ano."
         )
 
-    mensagem += (
-        "\nAguardo a aprovação da Secretaria."
+    link_whatsapp = (
+        "https://wa.me/"
+        + numero_whatsapp
+        + "?text="
+        + quote(mensagem)
     )
 
-    link_zap = (
-        f"https://wa.me/{numero_secretaria}"
-        f"?text={quote(mensagem)}"
+    return render_template(
+        "confirmacao.html",
+        reserva=sala,
+        data=data_obj,
+        hora_inicio=hora_inicio,
+        hora_fim=hora_fim,
+        qtd_pessoas=qtd_pessoas,
+        observacao=observacao,
+        link_whatsapp=link_whatsapp
     )
 
-    flash(
-        "Solicitação enviada com sucesso! "
-        f"<br><br>"
-        f'<a href="{link_zap}" target="_blank" '
-        f'class="btn btn-success">'
-        "Avisar Secretaria no WhatsApp"
-        "</a>",
-        "info"
-    )
 
-    return redirect(
-        url_for("index")
+# ============================================================
+# AGENDA DE RESERVAS
+# ============================================================
+
+@app.route("/agenda")
+@admin_required
+def agenda():
+
+    reservas = Reserva.query.order_by(
+        Reserva.data.asc(),
+        Reserva.hora_inicio.asc()
+    ).all()
+
+    return render_template(
+        "agenda.html",
+        reservas=reservas
     )
 
 
@@ -918,14 +968,10 @@ def confirmar():
 @admin_required
 def admin():
 
-    reservas = (
-        Reserva.query
-        .order_by(
-            Reserva.data.asc(),
-            Reserva.hora_inicio.asc()
-        )
-        .all()
-    )
+    reservas = Reserva.query.order_by(
+        Reserva.data.asc(),
+        Reserva.hora_inicio.asc()
+    ).all()
 
     return render_template(
         "admin.html",
@@ -937,12 +983,9 @@ def admin():
 # APROVAR RESERVA
 # ============================================================
 
-@app.route(
-    "/aprovar/<int:id>",
-    methods=["POST"]
-)
+@app.route("/aprovar/<int:id>")
 @admin_required
-def aprovar_reserva(id):
+def aprovar(id):
 
     reserva = db.session.get(
         Reserva,
@@ -960,20 +1003,30 @@ def aprovar_reserva(id):
             url_for("admin")
         )
 
-    # Antes de aprovar, verifica novamente se não surgiu
-    # outra reserva conflitante.
-    conflito = existe_conflito(
+    if reserva.status == "Aprovado":
+
+        flash(
+            "Esta reserva já está aprovada.",
+            "warning"
+        )
+
+        return redirect(
+            url_for("admin")
+        )
+
+    # Verifica novamente se surgiu conflito
+    # antes da aprovação.
+    if existe_conflito(
         reserva.sala_id,
         reserva.data,
         reserva.hora_inicio,
-        reserva.hora_fim
-    )
-
-    if conflito and conflito.id != reserva.id:
+        reserva.hora_fim,
+        reserva.id
+    ):
 
         flash(
-            "Não foi possível aprovar esta reserva porque "
-            "existe outra reserva no mesmo horário.",
+            "Não é possível aprovar esta reserva "
+            "porque existe conflito de horário.",
             "danger"
         )
 
@@ -986,7 +1039,7 @@ def aprovar_reserva(id):
     db.session.commit()
 
     flash(
-        f"Reserva de {reserva.usuario.username} aprovada!",
+        "Reserva aprovada com sucesso.",
         "success"
     )
 
@@ -996,149 +1049,7 @@ def aprovar_reserva(id):
 
 
 # ============================================================
-# PREPARAÇÃO DO BANCO
-# ============================================================
-
-def atualizar_estrutura_banco():
-
-    """
-    Atualiza pequenas alterações estruturais no PostgreSQL
-    existente sem apagar os dados.
-    """
-
-    inspector = db.inspect(
-        db.engine
-    )
-
-    tabelas = inspector.get_table_names()
-
-    # Se a tabela ainda não existir, db.create_all()
-    # será responsável por criá-la.
-    if "reserva" not in tabelas:
-
-        return
-
-    colunas_reserva = [
-        coluna["name"]
-        for coluna in inspector.get_columns("reserva")
-    ]
-
-    # Adiciona a coluna observacao aos bancos existentes.
-    if "observacao" not in colunas_reserva:
-
-        print(
-            "Atualizando banco: adicionando coluna observacao..."
-        )
-
-        with db.engine.begin() as connection:
-
-            connection.exec_driver_sql(
-                "ALTER TABLE reserva "
-                "ADD COLUMN observacao TEXT"
-            )
-
-        print(
-            "Coluna observacao adicionada com sucesso."
-        )
-
-
-def setup_db():
-
-    print(
-        "Iniciando configuração do banco de dados..."
-    )
-
-    # Cria as tabelas caso ainda não existam.
-    db.create_all()
-
-    # Atualiza a estrutura das tabelas existentes.
-    atualizar_estrutura_banco()
-
-    print(
-        "Tabelas verificadas/criadas com sucesso."
-    )
-
-    # --------------------------------------------------------
-    # Administrador inicial
-    # --------------------------------------------------------
-
-    admin_email = os.environ.get(
-        "ADMIN_EMAIL",
-        "teste@gmail.com"
-    ).strip().lower()
-
-    admin_password = os.environ.get(
-        "ADMIN_PASSWORD",
-        "123456"
-    )
-
-    admin_user = User.query.filter_by(
-        email=admin_email
-    ).first()
-
-    if admin_user:
-
-        admin_user.is_admin = True
-
-        print(
-            f"Usuário administrador encontrado: {admin_email}"
-        )
-
-    else:
-
-        senha_hash = bcrypt.generate_password_hash(
-            admin_password
-        ).decode("utf-8")
-
-        admin_user = User(
-            username="Administrador",
-            email=admin_email,
-            password=senha_hash,
-            is_admin=True
-        )
-
-        db.session.add(
-            admin_user
-        )
-
-        print(
-            f"Administrador criado: {admin_email}"
-        )
-
-    # --------------------------------------------------------
-    # Salas iniciais
-    # --------------------------------------------------------
-
-    if not Sala.query.first():
-
-        db.session.add_all([
-            Sala(
-                nome="Sala Catequese 01",
-                capacidade=15
-            ),
-            Sala(
-                nome="Sala Reuniões 02",
-                capacidade=35
-            ),
-            Sala(
-                nome="Auditório São Judas",
-                capacidade=100
-            )
-        ])
-
-        print(
-            "Salas iniciais cadastradas."
-        )
-
-    db.session.commit()
-
-    print(
-        "Configuração do banco concluída."
-    )
-
-
-# ============================================================
-# INICIALIZAÇÃO
+# INICIALIZAÇÃO DO BANCO
 # ============================================================
 
 with app.app_context():
@@ -1153,5 +1064,11 @@ with app.app_context():
 if __name__ == "__main__":
 
     app.run(
-        debug=True
+        host="0.0.0.0",
+        port=int(
+            os.environ.get(
+                "PORT",
+                5000
+            )
+        )
     )
