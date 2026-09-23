@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container py-4">
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+
+            <h3 class="mb-4">Confirmar Pré-agendamento</h3>
+
+            <div class="alert alert-info">
+                Confira os dados da solicitação antes de confirmar.
+            </div>
+
+            <div class="row">
+
+                <div class="col-md-6 mb-3">
+                    <strong>Data:</strong><br>
+                    {{ data }}
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <strong>Sala:</strong><br>
+                    {{ sala.nome }}
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <strong>Horário:</strong><br>
+                    {{ h_inicio }} às {{ h_fim }}
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <strong>Quantidade de pessoas:</strong><br>
+                    {{ qtd }}
+                </div>
+
+            </div>
+
+            {% if observacao %}
+            <div class="mb-3">
+                <strong>Observação:</strong><br>
+                {{ observacao }}
+            </div>
+            {% endif %}
+
+            {% if recorrente %}
+            <div class="alert alert-warning">
+                <strong>Reserva recorrente:</strong><br>
+                Esta solicitação será repetida semanalmente até o final do ano.
+            </div>
+            {% endif %}
+
+            <hr>
+
+            <form action="{{ url_for('finalizar') }}" method="POST">
+
+                <input type="hidden" name="data" value="{{ data }}">
+                <input type="hidden" name="h_inicio" value="{{ h_inicio }}">
+                <input type="hidden" name="h_fim" value="{{ h_fim }}">
+                <input type="hidden" name="qtd" value="{{ qtd }}">
+                <input type="hidden" name="sala_id" value="{{ sala.id }}">
+                <input type="hidden" name="observacao" value="{{ observacao or '' }}">
+                <input type="hidden" name="recorrente" value="{{ '1' if recorrente else '0' }}">
+
+                <div class="d-flex gap-2">
+
+                    <a href="{{ url_for('solicitar') }}"
+                       class="btn btn-secondary">
+                        Voltar
+                    </a>
+
+                    <button type="submit"
+                            class="btn btn-success">
+                        Confirmar Pré-agendamento
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
