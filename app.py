@@ -3,31 +3,21 @@ from functools import wraps
 from datetime import datetime, date, timedelta
 from urllib.parse import quote
 
-from flask import (
-    Flask,
-    render_template,
-    request,
-    redirect,
-    url_for,
-    flash
-)
-
+from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
+    LoginManager,
     UserMixin,
     login_user,
     logout_user,
     login_required,
-    current_user,
-    LoginManager
+    current_user
 )
-
 from flask_bcrypt import Bcrypt
 from sqlalchemy import inspect, text
 
 
 app = Flask(__name__)
-
 
 # ============================================================
 # CONFIGURAÇÕES
@@ -45,7 +35,6 @@ database_url = os.environ.get(
 
 # Compatibilidade com URLs antigas do PostgreSQL
 if database_url.startswith("postgres://"):
-
     database_url = database_url.replace(
         "postgres://",
         "postgresql://",
@@ -53,22 +42,15 @@ if database_url.startswith("postgres://"):
     )
 
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
-
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 
 db = SQLAlchemy(app)
-
 bcrypt = Bcrypt(app)
 
-
 login_manager = LoginManager(app)
-
 login_manager.login_view = "login"
-
-login_manager.login_message = (
-    "Faça login para acessar esta página."
-)
+login_manager.login_message = "Faça login para acessar esta página."
 
 
 # ============================================================
@@ -76,35 +58,13 @@ login_manager.login_message = (
 # ============================================================
 
 class User(UserMixin, db.Model):
-
     __tablename__ = "user"
 
-    id = db.Column(
-        db.Integer,
-        primary_key=True
-    )
-
-    username = db.Column(
-        db.String(100),
-        nullable=False
-    )
-
-    email = db.Column(
-        db.String(100),
-        unique=True,
-        nullable=False
-    )
-
-    password = db.Column(
-        db.String(200),
-        nullable=False
-    )
-
-    is_admin = db.Column(
-        db.Boolean,
-        default=False,
-        nullable=False
-    )
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    password = db.Column(db.String(200), nullable=False)
+    is_admin = db.Column(db.Boolean, default=False, nullable=False)
 
     reservas = db.relationship(
         "Reserva",
@@ -114,23 +74,11 @@ class User(UserMixin, db.Model):
 
 
 class Sala(db.Model):
-
     __tablename__ = "sala"
 
-    id = db.Column(
-        db.Integer,
-        primary_key=True
-    )
-
-    nome = db.Column(
-        db.String(100),
-        nullable=False
-    )
-
-    capacidade = db.Column(
-        db.Integer,
-        nullable=False
-    )
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    capacidade = db.Column(db.Integer, nullable=False)
 
     reservas = db.relationship(
         "Reserva",
@@ -140,18 +88,11 @@ class Sala(db.Model):
 
 
 class Reserva(db.Model):
-
     __tablename__ = "reserva"
 
-    id = db.Column(
-        db.Integer,
-        primary_key=True
-    )
+    id = db.Column(db.Integer, primary_key=True)
 
-    data = db.Column(
-        db.Date,
-        nullable=False
-    )
+    data = db.Column(db.Date, nullable=False)
 
     hora_inicio = db.Column(
         db.String(5),
@@ -168,7 +109,14 @@ class Reserva(db.Model):
         nullable=False
     )
 
+    # Observação feita por quem solicitou a reserva
     observacao = db.Column(
+        db.Text,
+        nullable=True
+    )
+
+    # Motivo registrado pela administração ao reprovar
+    motivo_reprovacao = db.Column(
         db.Text,
         nullable=True
     )
@@ -198,11 +146,7 @@ class Reserva(db.Model):
 
 @login_manager.user_loader
 def load_user(user_id):
-
-    return db.session.get(
-        User,
-        int(user_id)
-    )
+    return db.session.get(User, int(user_id))
 
 
 # ============================================================
@@ -210,21 +154,16 @@ def load_user(user_id):
 # ============================================================
 
 def admin_required(f):
-
     @wraps(f)
     @login_required
     def decorated_function(*args, **kwargs):
 
         if not current_user.is_admin:
-
             flash(
                 "Acesso restrito à administração da paróquia.",
                 "danger"
             )
-
-            return redirect(
-                url_for("index")
-            )
+            return redirect(url_for("index"))
 
         return f(*args, **kwargs)
 
@@ -242,24 +181,54 @@ def existe_conflito(
     h_fim,
     reserva_id=None
 ):
+    """
+    Verifica se existe outra reserva Pendente ou Aprovada
+    para a mesma sala, data e horário.
+
+    Reservas Reprovadas não bloqueiam o horário.
+    """
 
     consulta = Reserva.query.filter(
         Reserva.sala_id == sala_id,
         Reserva.data == data_obj,
-        Reserva.status.in_(
-            ["Pendente", "Aprovado"]
-        ),
-        Reserva.hora_inicio < h_fim,
-        Reserva.hora_fim > h_inicio
+        Reserva.status.in_(["Pendente", "Aprovado"])
     )
 
     if reserva_id is not None:
-
         consulta = consulta.filter(
             Reserva.id != reserva_id
         )
 
-    return consulta.first() is not None
+    inicio_novo = datetime.strptime(
+        h_inicio,
+        "%H:%M"
+    ).time()
+
+    fim_novo = datetime.strptime(
+        h_fim,
+        "%H:%M"
+    ).time()
+
+    for reserva in consulta.all():
+
+        inicio_existente = datetime.strptime(
+            reserva.hora_inicio,
+            "%H:%M"
+        ).time()
+
+        fim_existente = datetime.strptime(
+            reserva.hora_fim,
+            "%H:%M"
+        ).time()
+
+        # Existe conflito quando os intervalos se sobrepõem
+        if (
+            inicio_existente < fim_novo
+            and fim_existente > inicio_novo
+        ):
+            return True
+
+    return False
 
 
 # ============================================================
@@ -267,32 +236,69 @@ def existe_conflito(
 # ============================================================
 
 def atualizar_estrutura_banco():
+    """
+    Verifica se as colunas adicionadas posteriormente
+    existem no banco de dados.
 
-    inspector = inspect(
-        db.engine
-    )
+    Isso permite atualizar o PostgreSQL do Render
+    sem apagar as reservas existentes.
+    """
+
+    inspector = inspect(db.engine)
 
     tabelas = inspector.get_table_names()
 
-    if "reserva" in tabelas:
+    if "reserva" not in tabelas:
+        return
 
-        colunas = [
-            coluna["name"]
-            for coluna in inspector.get_columns(
-                "reserva"
-            )
-        ]
+    colunas_reserva = [
+        coluna["name"]
+        for coluna in inspector.get_columns("reserva")
+    ]
 
-        if "observacao" not in colunas:
+    # --------------------------------------------------------
+    # Campo observacao
+    # --------------------------------------------------------
 
-            with db.engine.begin() as connection:
+    if "observacao" not in colunas_reserva:
 
-                connection.execute(
-                    text(
-                        "ALTER TABLE reserva "
-                        "ADD COLUMN observacao TEXT"
-                    )
+        print(
+            "Adicionando coluna 'observacao' à tabela reserva..."
+        )
+
+        with db.engine.begin() as conexao:
+            conexao.execute(
+                text(
+                    "ALTER TABLE reserva "
+                    "ADD COLUMN observacao TEXT"
                 )
+            )
+
+    # --------------------------------------------------------
+    # Campo motivo_reprovacao
+    # --------------------------------------------------------
+
+    inspector = inspect(db.engine)
+
+    colunas_reserva = [
+        coluna["name"]
+        for coluna in inspector.get_columns("reserva")
+    ]
+
+    if "motivo_reprovacao" not in colunas_reserva:
+
+        print(
+            "Adicionando coluna "
+            "'motivo_reprovacao' à tabela reserva..."
+        )
+
+        with db.engine.begin() as conexao:
+            conexao.execute(
+                text(
+                    "ALTER TABLE reserva "
+                    "ADD COLUMN motivo_reprovacao TEXT"
+                )
+            )
 
 
 # ============================================================
@@ -329,21 +335,21 @@ def setup_db():
 
     if admin:
 
+        # Garante que a conta configurada seja administradora
         if not admin.is_admin:
 
             admin.is_admin = True
-
             db.session.commit()
+
+            print(
+                f"Administrador atualizado: {admin_email}"
+            )
 
     else:
 
-        senha_hash = (
-            bcrypt
-            .generate_password_hash(
-                admin_password
-            )
-            .decode("utf-8")
-        )
+        senha_hash = bcrypt.generate_password_hash(
+            admin_password
+        ).decode("utf-8")
 
         admin = User(
             username="Administrador",
@@ -353,7 +359,6 @@ def setup_db():
         )
 
         db.session.add(admin)
-
         db.session.commit()
 
         print(
@@ -364,33 +369,24 @@ def setup_db():
     # SALAS INICIAIS
     # --------------------------------------------------------
 
-    # As salas são criadas somente se o banco ainda não possuir
-    # nenhuma sala. Depois disso, novas salas poderão ser
-    # acrescentadas futuramente sem alterar esta estrutura.
-
     if Sala.query.count() == 0:
 
-        salas = [
-
+        salas_iniciais = [
             Sala(
                 nome="Sala Catequese 01",
                 capacidade=15
             ),
-
             Sala(
                 nome="Sala Reuniões 02",
                 capacidade=35
             ),
-
             Sala(
                 nome="Auditório São Judas",
                 capacidade=100
             )
-
         ]
 
-        db.session.add_all(salas)
-
+        db.session.add_all(salas_iniciais)
         db.session.commit()
 
         print(
@@ -467,13 +463,9 @@ def cadastro():
                 url_for("cadastro")
             )
 
-        senha_hash = (
-            bcrypt
-            .generate_password_hash(
-                password
-            )
-            .decode("utf-8")
-        )
+        senha_hash = bcrypt.generate_password_hash(
+            password
+        ).decode("utf-8")
 
         novo_usuario = User(
             username=username,
@@ -482,14 +474,11 @@ def cadastro():
             is_admin=False
         )
 
-        db.session.add(
-            novo_usuario
-        )
-
+        db.session.add(novo_usuario)
         db.session.commit()
 
         flash(
-            "Cadastro realizado com sucesso. Faça login.",
+            "Cadastro realizado com sucesso.",
             "success"
         )
 
@@ -528,14 +517,25 @@ def login():
             email=email
         ).first()
 
-        if usuario and bcrypt.check_password_hash(
-            usuario.password,
-            password
+        if (
+            usuario
+            and bcrypt.check_password_hash(
+                usuario.password,
+                password
+            )
         ):
 
-            login_user(
-                usuario
+            login_user(usuario)
+
+            flash(
+                "Login realizado com sucesso.",
+                "success"
             )
+
+            if usuario.is_admin:
+                return redirect(
+                    url_for("admin")
+                )
 
             return redirect(
                 url_for("index")
@@ -562,7 +562,7 @@ def logout():
     logout_user()
 
     flash(
-        "Você saiu do sistema.",
+        "Você saiu da sua conta.",
         "success"
     )
 
@@ -575,87 +575,17 @@ def logout():
 # SOLICITAR RESERVA
 # ============================================================
 
-@app.route(
-    "/solicitar",
-    methods=["GET", "POST"]
-)
+@app.route("/solicitar")
 @login_required
 def solicitar():
 
-    if request.method == "POST":
-
-        data_str = request.form.get(
-            "data",
-            ""
-        ).strip()
-
-        qtd_str = request.form.get(
-            "qtd_pessoas",
-            ""
-        ).strip()
-
-        try:
-
-            data_obj = datetime.strptime(
-                data_str,
-                "%Y-%m-%d"
-            ).date()
-
-            qtd_pessoas = int(
-                qtd_str
-            )
-
-        except (ValueError, TypeError):
-
-            flash(
-                "Informe uma data e quantidade de pessoas válidas.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("solicitar")
-            )
-
-        if data_obj < date.today():
-
-            flash(
-                "Não é possível solicitar uma reserva para uma data passada.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("solicitar")
-            )
-
-        if qtd_pessoas <= 0:
-
-            flash(
-                "A quantidade de pessoas deve ser maior que zero.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("solicitar")
-            )
-
-        salas = Sala.query.filter(
-            Sala.capacidade >= qtd_pessoas
-        ).order_by(
-            Sala.capacidade.asc()
-        ).all()
-
-        return render_template(
-            "solicitar.html",
-            salas=salas,
-            data=data_str,
-            qtd_pessoas=qtd_pessoas
-        )
+    salas = Sala.query.order_by(
+        Sala.nome.asc()
+    ).all()
 
     return render_template(
         "solicitar.html",
-        salas=[],
-        data="",
-        qtd_pessoas=""
+        salas=salas
     )
 
 
@@ -685,7 +615,7 @@ def confirmar():
         ""
     ).strip()
 
-    qtd_str = request.form.get(
+    qtd_pessoas_str = request.form.get(
         "qtd_pessoas",
         ""
     ).strip()
@@ -700,34 +630,60 @@ def confirmar():
         ""
     ).strip()
 
-    recorrencia = request.form.get(
-        "recorrencia",
-        ""
-    ).strip()
+    recorrente = request.form.get(
+        "recorrente"
+    )
 
     # --------------------------------------------------------
-    # VALIDAÇÕES
+    # Validação dos campos
     # --------------------------------------------------------
+
+    if not all([
+        data_str,
+        hora_inicio,
+        hora_fim,
+        qtd_pessoas_str,
+        sala_id_str
+    ]):
+
+        flash(
+            "Preencha todos os campos obrigatórios.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("solicitar")
+        )
 
     try:
 
-        data_obj = datetime.strptime(
+        data_inicial = datetime.strptime(
             data_str,
             "%Y-%m-%d"
         ).date()
 
         qtd_pessoas = int(
-            qtd_str
+            qtd_pessoas_str
         )
 
         sala_id = int(
             sala_id_str
         )
 
-    except (ValueError, TypeError):
+        inicio = datetime.strptime(
+            hora_inicio,
+            "%H:%M"
+        ).time()
+
+        fim = datetime.strptime(
+            hora_fim,
+            "%H:%M"
+        ).time()
+
+    except ValueError:
 
         flash(
-            "Dados inválidos para a reserva.",
+            "Informe os dados em formato válido.",
             "danger"
         )
 
@@ -735,16 +691,59 @@ def confirmar():
             url_for("solicitar")
         )
 
-    if data_obj < date.today():
+    # --------------------------------------------------------
+    # Data
+    # --------------------------------------------------------
+
+    if data_inicial < date.today():
 
         flash(
-            "Não é possível reservar uma data passada.",
+            "Não é possível solicitar uma reserva para uma data passada.",
             "danger"
         )
 
         return redirect(
             url_for("solicitar")
         )
+
+    # --------------------------------------------------------
+    # Horário
+    # --------------------------------------------------------
+
+    if fim <= inicio:
+
+        flash(
+            "O horário de término deve ser posterior ao horário de início.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("solicitar")
+        )
+
+    # --------------------------------------------------------
+    # Limite de 22h
+    # --------------------------------------------------------
+
+    limite_22h = datetime.strptime(
+        "22:00",
+        "%H:%M"
+    ).time()
+
+    if fim > limite_22h:
+
+        flash(
+            "As reservas devem terminar até as 22h.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("solicitar")
+        )
+
+    # --------------------------------------------------------
+    # Quantidade de pessoas
+    # --------------------------------------------------------
 
     if qtd_pessoas <= 0:
 
@@ -756,6 +755,10 @@ def confirmar():
         return redirect(
             url_for("solicitar")
         )
+
+    # --------------------------------------------------------
+    # Sala
+    # --------------------------------------------------------
 
     sala = db.session.get(
         Sala,
@@ -776,7 +779,8 @@ def confirmar():
     if qtd_pessoas > sala.capacidade:
 
         flash(
-            "A quantidade de pessoas excede a capacidade da sala.",
+            f"A sala selecionada comporta no máximo "
+            f"{sala.capacidade} pessoas.",
             "danger"
         )
 
@@ -785,91 +789,33 @@ def confirmar():
         )
 
     # --------------------------------------------------------
-    # VALIDAÇÃO DOS HORÁRIOS
-    # --------------------------------------------------------
-
-    try:
-
-        inicio = datetime.strptime(
-            hora_inicio,
-            "%H:%M"
-        )
-
-        fim = datetime.strptime(
-            hora_fim,
-            "%H:%M"
-        )
-
-    except ValueError:
-
-        flash(
-            "Informe horários válidos.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("solicitar")
-        )
-
-    if fim <= inicio:
-
-        flash(
-            "O horário de término deve ser posterior ao horário de início.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("solicitar")
-        )
-
-    limite = datetime.strptime(
-        "22:00",
-        "%H:%M"
-    )
-
-    if fim > limite:
-
-        flash(
-            "As reservas devem terminar até às 22h.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("solicitar")
-        )
-
-    # --------------------------------------------------------
-    # DATAS DA RESERVA
+    # Datas da reserva
     # --------------------------------------------------------
 
     datas_reserva = [
-        data_obj
+        data_inicial
     ]
 
-    if recorrencia == "semanal":
+    # Se for recorrente, cria semanalmente
+    # até o final do ano atual.
+    if recorrente:
 
-        proxima_data = data_obj + timedelta(
+        data_atual = data_inicial + timedelta(
             days=7
         )
 
-        ultimo_dia_ano = date(
-            data_obj.year,
-            12,
-            31
-        )
-
-        while proxima_data <= ultimo_dia_ano:
+        while data_atual.year == data_inicial.year:
 
             datas_reserva.append(
-                proxima_data
+                data_atual
             )
 
-            proxima_data += timedelta(
+            data_atual += timedelta(
                 days=7
             )
 
     # --------------------------------------------------------
-    # VERIFICA CONFLITOS
+    # Verificação de conflitos
     # --------------------------------------------------------
 
     for data_reserva in datas_reserva:
@@ -881,14 +827,12 @@ def confirmar():
             hora_fim
         ):
 
-            data_formatada = (
-                data_reserva.strftime(
-                    "%d/%m/%Y"
-                )
+            data_formatada = data_reserva.strftime(
+                "%d/%m/%Y"
             )
 
             flash(
-                f"Já existe uma reserva para a sala "
+                f"Já existe uma reserva para "
                 f"{sala.nome} em {data_formatada} "
                 f"nesse horário.",
                 "danger"
@@ -899,87 +843,75 @@ def confirmar():
             )
 
     # --------------------------------------------------------
-    # CRIA RESERVAS
+    # Criação das reservas
     # --------------------------------------------------------
-
-    reservas_criadas = []
 
     for data_reserva in datas_reserva:
 
-        reserva = Reserva(
+        nova_reserva = Reserva(
             data=data_reserva,
             hora_inicio=hora_inicio,
             hora_fim=hora_fim,
             qtd_pessoas=qtd_pessoas,
             observacao=observacao,
+            motivo_reprovacao=None,
             status="Pendente",
             usuario_id=current_user.id,
             sala_id=sala.id
         )
 
         db.session.add(
-            reserva
-        )
-
-        reservas_criadas.append(
-            reserva
+            nova_reserva
         )
 
     db.session.commit()
 
     # --------------------------------------------------------
-    # WHATSAPP
+    # Link para WhatsApp
     # --------------------------------------------------------
 
-    whatsapp_numero = os.environ.get(
+    numero_whatsapp = os.environ.get(
         "WHATSAPP_SECRETARIA",
         "5538999999999"
     )
 
-    if len(datas_reserva) == 1:
-
-        data_mensagem = (
-            datas_reserva[0]
-            .strftime("%d/%m/%Y")
-        )
-
-    else:
-
-        data_mensagem = (
-            f"{datas_reserva[0].strftime('%d/%m/%Y')} "
-            f"(e demais datas semanais)"
-        )
-
     mensagem = (
-        "Nova solicitação de reserva de sala\n\n"
+        "Nova solicitação de reserva de sala.\n\n"
         f"Solicitante: {current_user.username}\n"
-        f"Data: {data_mensagem}\n"
-        f"Horário: {hora_inicio} às {hora_fim}\n"
         f"Sala: {sala.nome}\n"
+        f"Data inicial: {data_inicial.strftime('%d/%m/%Y')}\n"
+        f"Horário: {hora_inicio} às {hora_fim}\n"
         f"Pessoas: {qtd_pessoas}\n"
     )
 
-    if observacao:
+    if recorrente:
+        mensagem += (
+            "Reserva recorrente: semanal\n"
+        )
 
+    if observacao:
         mensagem += (
             f"Observação: {observacao}\n"
         )
 
+    mensagem += (
+        "\nA solicitação aguarda análise da administração."
+    )
+
     whatsapp_link = (
         "https://wa.me/"
-        + whatsapp_numero
+        + numero_whatsapp
         + "?text="
         + quote(mensagem)
     )
 
     flash(
-        "Solicitação registrada com sucesso.",
+        "Solicitação enviada com sucesso.",
         "success"
     )
 
     return render_template(
-        "confirmacao.html",
-        reservas=reservas_criadas,
+        "confirmar.html",
         whatsapp_link=whatsapp_link
     )
 
@@ -993,7 +925,7 @@ def confirmar():
 def agenda():
 
     # --------------------------------------------------------
-    # FILTRO POR DATA
+    # Filtro por data
     # --------------------------------------------------------
 
     data_str = request.args.get(
@@ -1014,17 +946,10 @@ def agenda():
 
         except ValueError:
 
-            flash(
-                "Data inválida.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("agenda")
-            )
+            data_filtro = None
 
     # --------------------------------------------------------
-    # FILTRO POR SALA
+    # Filtro por sala
     # --------------------------------------------------------
 
     sala_id_str = request.args.get(
@@ -1033,44 +958,28 @@ def agenda():
     ).strip()
 
     sala_filtro = None
+    sala_id_filtro = None
 
     if sala_id_str:
 
         try:
 
-            sala_id = int(
+            sala_id_filtro = int(
                 sala_id_str
+            )
+
+            sala_filtro = db.session.get(
+                Sala,
+                sala_id_filtro
             )
 
         except ValueError:
 
-            flash(
-                "Sala inválida.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("agenda")
-            )
-
-        sala_filtro = db.session.get(
-            Sala,
-            sala_id
-        )
-
-        if not sala_filtro:
-
-            flash(
-                "Sala não encontrada.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("agenda")
-            )
+            sala_id_filtro = None
+            sala_filtro = None
 
     # --------------------------------------------------------
-    # TODAS AS SALAS
+    # Salas disponíveis
     # --------------------------------------------------------
 
     salas = Sala.query.order_by(
@@ -1078,112 +987,94 @@ def agenda():
     ).all()
 
     # --------------------------------------------------------
-    # MÊS DO CALENDÁRIO
+    # Mês da agenda
     # --------------------------------------------------------
+
+    hoje = date.today()
 
     mes_str = request.args.get(
         "mes",
         ""
     ).strip()
 
-    if mes_str:
+    try:
 
-        try:
+        if mes_str:
 
-            mes_data = datetime.strptime(
-                mes_str,
-                "%Y-%m"
+            primeiro_dia_mes = datetime.strptime(
+                mes_str + "-01",
+                "%Y-%m-%d"
             ).date()
 
-        except ValueError:
+        else:
 
-            mes_data = date.today()
+            primeiro_dia_mes = hoje.replace(
+                day=1
+            )
 
-    else:
+    except ValueError:
 
-        mes_data = (
-            data_filtro
-            if data_filtro
-            else date.today()
+        primeiro_dia_mes = hoje.replace(
+            day=1
         )
 
     # --------------------------------------------------------
-    # PRIMEIRO DIA DO MÊS
+    # Mês anterior
     # --------------------------------------------------------
 
-    primeiro_dia_mes = date(
-        mes_data.year,
-        mes_data.month,
-        1
-    )
+    if primeiro_dia_mes.month == 1:
 
-    # --------------------------------------------------------
-    # MÊS ANTERIOR
-    # --------------------------------------------------------
-
-    if mes_data.month == 1:
-
-        mes_anterior = date(
-            mes_data.year - 1,
-            12,
-            1
+        mes_anterior = primeiro_dia_mes.replace(
+            year=primeiro_dia_mes.year - 1,
+            month=12,
+            day=1
         )
 
     else:
 
-        mes_anterior = date(
-            mes_data.year,
-            mes_data.month - 1,
-            1
+        mes_anterior = primeiro_dia_mes.replace(
+            month=primeiro_dia_mes.month - 1,
+            day=1
         )
 
     # --------------------------------------------------------
-    # PRÓXIMO MÊS
+    # Próximo mês
     # --------------------------------------------------------
 
-    if mes_data.month == 12:
+    if primeiro_dia_mes.month == 12:
 
-        proximo_mes = date(
-            mes_data.year + 1,
-            1,
-            1
-        )
-
-    else:
-
-        proximo_mes = date(
-            mes_data.year,
-            mes_data.month + 1,
-            1
-        )
-
-    # --------------------------------------------------------
-    # PRIMEIRO DIA DO PRÓXIMO MÊS
-    # --------------------------------------------------------
-
-    if mes_data.month == 12:
-
-        inicio_proximo_mes = date(
-            mes_data.year + 1,
-            1,
-            1
+        proximo_mes = primeiro_dia_mes.replace(
+            year=primeiro_dia_mes.year + 1,
+            month=1,
+            day=1
         )
 
     else:
 
-        inicio_proximo_mes = date(
-            mes_data.year,
-            mes_data.month + 1,
-            1
+        proximo_mes = primeiro_dia_mes.replace(
+            month=primeiro_dia_mes.month + 1,
+            day=1
         )
 
     # --------------------------------------------------------
-    # RESERVAS DO MÊS
+    # Início e fim do mês
+    # --------------------------------------------------------
+
+    if proximo_mes.month == 1:
+
+        primeiro_dia_proximo_mes = proximo_mes
+
+    else:
+
+        primeiro_dia_proximo_mes = proximo_mes
+
+    # --------------------------------------------------------
+    # Reservas do mês
     # --------------------------------------------------------
 
     consulta_mes = Reserva.query.filter(
         Reserva.data >= primeiro_dia_mes,
-        Reserva.data < inicio_proximo_mes
+        Reserva.data < primeiro_dia_proximo_mes
     )
 
     if sala_filtro:
@@ -1197,19 +1088,13 @@ def agenda():
         Reserva.hora_inicio.asc()
     ).all()
 
-    # --------------------------------------------------------
-    # DIAS COM RESERVA
-    # --------------------------------------------------------
-
-    dias_com_reserva = sorted(
-        {
-            reserva.data.day
-            for reserva in reservas_mes
-        }
-    )
+    dias_com_reserva = {
+        reserva.data.day
+        for reserva in reservas_mes
+    }
 
     # --------------------------------------------------------
-    # RESERVAS DA LISTA
+    # Reservas exibidas na tabela
     # --------------------------------------------------------
 
     consulta = Reserva.query
@@ -1218,6 +1103,13 @@ def agenda():
 
         consulta = consulta.filter(
             Reserva.data == data_filtro
+        )
+
+    else:
+
+        consulta = consulta.filter(
+            Reserva.data >= primeiro_dia_mes,
+            Reserva.data < primeiro_dia_proximo_mes
         )
 
     if sala_filtro:
@@ -1231,94 +1123,36 @@ def agenda():
         Reserva.hora_inicio.asc()
     ).all()
 
-    # --------------------------------------------------------
-    # NOME DO MÊS
-    # --------------------------------------------------------
-
-    meses = [
-        "",
-        "Janeiro",
-        "Fevereiro",
-        "Março",
-        "Abril",
-        "Maio",
-        "Junho",
-        "Julho",
-        "Agosto",
-        "Setembro",
-        "Outubro",
-        "Novembro",
-        "Dezembro"
-    ]
-
-    nome_mes = (
-        f"{meses[mes_data.month]} "
-        f"{mes_data.year}"
-    )
-
-    # --------------------------------------------------------
-    # ENVIA OS DADOS PARA O TEMPLATE
-    # --------------------------------------------------------
-
     return render_template(
         "agenda.html",
-
         reservas=reservas,
-
-        data_filtro=data_str,
-
         salas=salas,
-
         sala_filtro=sala_filtro,
-
-        sala_id_filtro=(
-            sala_filtro.id
-            if sala_filtro
-            else ""
-        ),
-
-        mes_atual=mes_data.strftime(
-            "%Y-%m"
-        ),
-
-        nome_mes=nome_mes,
-
-        mes_anterior=mes_anterior.strftime(
-            "%Y-%m"
-        ),
-
-        proximo_mes=proximo_mes.strftime(
-            "%Y-%m"
-        ),
-
-        dias_com_reserva=dias_com_reserva,
-
-        mes_numero=mes_data.month,
-
-        ano=mes_data.year,
-
-        primeiro_dia_mes=primeiro_dia_mes
+        sala_id_filtro=sala_id_filtro,
+        data_filtro=data_filtro,
+        primeiro_dia_mes=primeiro_dia_mes,
+        mes_anterior=mes_anterior,
+        proximo_mes=proximo_mes,
+        dias_com_reserva=dias_com_reserva
     )
 
 
 # ============================================================
-# PAINEL ADMINISTRATIVO
+# ADMINISTRAÇÃO
 # ============================================================
 
 @app.route("/admin")
 @admin_required
 def admin():
 
-    reservas_pendentes = Reserva.query.filter_by(
-        status="Pendente"
-    ).order_by(
+    reservas = Reserva.query.order_by(
         Reserva.data.asc(),
         Reserva.hora_inicio.asc()
     ).all()
 
     return render_template(
         "admin.html",
-        reservas=reservas_pendentes
+        reservas=reservas
     )
 
 
@@ -1328,7 +1162,7 @@ def admin():
 
 @app.route(
     "/aprovar/<int:id>",
-    methods=["POST", "GET"]
+    methods=["POST"]
 )
 @admin_required
 def aprovar(id):
@@ -1352,13 +1186,17 @@ def aprovar(id):
     if reserva.status != "Pendente":
 
         flash(
-            "Esta reserva não está pendente.",
+            "Somente reservas pendentes podem ser aprovadas.",
             "warning"
         )
 
         return redirect(
             url_for("admin")
         )
+
+    # --------------------------------------------------------
+    # Confirma novamente se não existe conflito
+    # --------------------------------------------------------
 
     if existe_conflito(
         reserva.sala_id,
@@ -1369,8 +1207,9 @@ def aprovar(id):
     ):
 
         flash(
-            "Não foi possível aprovar: "
-            "existe outra reserva conflitante para esta sala e horário.",
+            "Não foi possível aprovar esta reserva porque "
+            "existe conflito de horário com outra reserva "
+            "pendente ou aprovada.",
             "danger"
         )
 
@@ -1380,10 +1219,83 @@ def aprovar(id):
 
     reserva.status = "Aprovado"
 
+    # Ao aprovar, não existe mais motivo de reprovação
+    reserva.motivo_reprovacao = None
+
     db.session.commit()
 
     flash(
         "Reserva aprovada com sucesso.",
+        "success"
+    )
+
+    return redirect(
+        url_for("admin")
+    )
+
+
+# ============================================================
+# REPROVAR RESERVA
+# ============================================================
+
+@app.route(
+    "/reprovar/<int:id>",
+    methods=["POST"]
+)
+@admin_required
+def reprovar(id):
+
+    reserva = db.session.get(
+        Reserva,
+        id
+    )
+
+    if not reserva:
+
+        flash(
+            "Reserva não encontrada.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("admin")
+        )
+
+    if reserva.status != "Pendente":
+
+        flash(
+            "Somente reservas pendentes podem ser reprovadas.",
+            "warning"
+        )
+
+        return redirect(
+            url_for("admin")
+        )
+
+    motivo = request.form.get(
+        "motivo_reprovacao",
+        ""
+    ).strip()
+
+    if not motivo:
+
+        flash(
+            "Informe o motivo da reprovação.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("admin")
+        )
+
+    reserva.status = "Reprovado"
+
+    reserva.motivo_reprovacao = motivo
+
+    db.session.commit()
+
+    flash(
+        "Reserva reprovada com sucesso.",
         "success"
     )
 
@@ -1408,5 +1320,12 @@ with app.app_context():
 if __name__ == "__main__":
 
     app.run(
-        debug=True
+        host="0.0.0.0",
+        port=int(
+            os.environ.get(
+                "PORT",
+                5000
+            )
+        ),
+        debug=False
     )
