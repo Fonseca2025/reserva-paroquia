@@ -331,6 +331,40 @@ tbody tr:hover{
 }
 
 /* =========================
+   CAMPO DE MOTIVO
+========================= */
+
+.campo-motivo{
+    display:block;
+    width:220px;
+    min-height:70px;
+    margin-bottom:7px;
+    padding:9px 10px;
+    border:1px solid #d8d8d8;
+    border-radius:7px;
+    background:#fff;
+    color:var(--texto);
+    font-family:Arial,Helvetica,sans-serif;
+    font-size:12px;
+    resize:vertical;
+}
+
+.campo-motivo:focus{
+    outline:none;
+    border-color:var(--vermelho);
+    box-shadow:0 0 0 2px var(--vermelho-claro);
+}
+
+.aviso-motivo{
+    display:block;
+    width:220px;
+    margin-bottom:7px;
+    color:#777;
+    font-size:11px;
+    line-height:1.3;
+}
+
+/* =========================
    USUÁRIOS
 ========================= */
 
@@ -463,6 +497,11 @@ tbody tr:hover{
     td{
         padding:11px 10px;
         font-size:13px;
+    }
+
+    .campo-motivo,
+    .aviso-motivo{
+        width:200px;
     }
 }
 </style>
@@ -666,10 +705,21 @@ Aprovar
 
 
 <form
-action="{{ url_for('reprovar', id=reserva.id) }}"
 method="POST"
-onsubmit="return confirmarReprovacao();"
+action="{{ url_for('reprovar', id=reserva.id) }}"
+onsubmit="return confirmarReprovacao(this);"
 >
+
+<textarea
+name="motivo_reprovacao"
+class="campo-motivo"
+placeholder="Informe o motivo da reprovação..."
+required
+></textarea>
+
+<small class="aviso-motivo">
+O motivo será registrado no sistema.
+</small>
 
 <button
 type="submit"
@@ -933,10 +983,30 @@ function confirmarAprovacao(){
 }
 
 
-function confirmarReprovacao(){
+function confirmarReprovacao(formulario){
+
+    const campo =
+        formulario.querySelector(
+            'textarea[name="motivo_reprovacao"]'
+        );
+
+    const motivo =
+        campo.value.trim();
+
+    if (!motivo){
+
+        alert(
+            "Informe o motivo da reprovação."
+        );
+
+        campo.focus();
+
+        return false;
+    }
 
     return confirm(
-        "Deseja realmente reprovar esta reserva?"
+        "Deseja realmente reprovar esta reserva?\n\n" +
+        "O motivo informado será registrado no sistema."
     );
 
 }
