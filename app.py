@@ -64,6 +64,7 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
 
     reservas = db.relationship(
         "Reserva",
@@ -241,6 +242,34 @@ def atualizar_estrutura_banco():
     if "reserva" not in tabelas:
         return
 
+    # --------------------------------------------------------
+    # STATUS DO USUÁRIO
+    # --------------------------------------------------------
+
+    tabelas_atualizadas = inspect(db.engine).get_table_names()
+
+    if "user" in tabelas_atualizadas:
+
+        colunas_user = [
+            coluna["name"]
+            for coluna in inspect(db.engine).get_columns("user")
+        ]
+
+        if "ativo" not in colunas_user:
+
+            print(
+                "Adicionando coluna 'ativo' à tabela user..."
+            )
+
+            with db.engine.begin() as conexao:
+
+                conexao.execute(
+                    text(
+                        'ALTER TABLE "user" '
+                        'ADD COLUMN ativo BOOLEAN DEFAULT TRUE'
+                    )
+                )
+
     colunas_reserva = [
         coluna["name"]
         for coluna in inspector.get_columns("reserva")
@@ -327,9 +356,19 @@ def setup_db():
 
     if admin:
 
+        alterado = False
+
         if not admin.is_admin:
 
             admin.is_admin = True
+            alterado = True
+
+        if not admin.ativo:
+
+            admin.ativo = True
+            alterado = True
+
+        if alterado:
 
             db.session.commit()
 
@@ -553,7 +592,8 @@ def cadastro():
             username=username,
             email=email,
             password=senha_hash,
-            is_admin=False
+            is_admin=False,
+            ativo=True
         )
 
         db.session.add(
@@ -574,6 +614,31 @@ def cadastro():
     return render_template(
         "cadastro.html"
     )
+
+
+# ============================================================
+# VERIFICAÇÃO DE CONTA ATIVA
+# ============================================================
+
+@app.before_request
+def verificar_usuario_ativo():
+
+    if (
+        current_user.is_authenticated
+        and not current_user.is_admin
+        and not current_user.ativo
+    ):
+
+        logout_user()
+
+        flash(
+            "Sua conta foi bloqueada pela administração da paróquia.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("login")
+        )
 
 
 # ============================================================
@@ -609,6 +674,17 @@ def login():
                 password
             )
         ):
+
+            if not usuario.ativo and not usuario.is_admin:
+
+                flash(
+                    "Esta conta está bloqueada pela administração da paróquia.",
+                    "danger"
+                )
+
+                return redirect(
+                    url_for("login")
+                )
 
             login_user(usuario)
 
@@ -1391,6 +1467,67 @@ def usuarios():
     return render_template(
         "usuarios.html",
         usuarios=usuarios
+    )
+
+
+# ============================================================
+# BLOQUEAR / DESBLOQUEAR USUÁRIO
+# ============================================================
+
+@app.route(
+    "/alternar_usuario/<int:id>",
+    methods=["POST"]
+)
+@admin_required
+def alternar_usuario(id):
+
+    usuario = db.session.get(
+        User,
+        id
+    )
+
+    if not usuario:
+
+        flash(
+            "Usuário não encontrado.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("admin")
+        )
+
+    if usuario.is_admin:
+
+        flash(
+            "Contas de administrador não podem ser bloqueadas por esta função.",
+            "warning"
+        )
+
+        return redirect(
+            url_for("admin")
+        )
+
+    usuario.ativo = not usuario.ativo
+
+    db.session.commit()
+
+    if usuario.ativo:
+
+        flash(
+            f"O usuário {usuario.username} foi desbloqueado.",
+            "success"
+        )
+
+    else:
+
+        flash(
+            f"O usuário {usuario.username} foi bloqueado.",
+            "success"
+        )
+
+    return redirect(
+        url_for("admin") + "#usuarios"
     )
 
 
