@@ -4,9 +4,19 @@
 
 <div class="card p-4 shadow">
 
-    <h3 class="mb-4">Nova Solicitação de Reserva</h3>
+    <h3 class="mb-4">
+        Nova Solicitação de Reserva
+    </h3>
 
-    <form method="POST">
+
+    <!-- ================================================= -->
+    <!-- CONSULTA DE SALAS -->
+    <!-- ================================================= -->
+
+    <form
+        method="POST"
+        action="{{ url_for('solicitar') }}"
+    >
 
         <div class="row">
 
@@ -20,10 +30,12 @@
                     type="date"
                     name="data"
                     class="form-control"
+                    value="{{ data or '' }}"
                     required
                 >
 
             </div>
+
 
             <div class="col-md-6 mb-3">
 
@@ -36,12 +48,14 @@
                     name="qtd"
                     class="form-control"
                     min="1"
+                    value="{{ qtd or '' }}"
                     required
                 >
 
             </div>
 
         </div>
+
 
         <button
             type="submit"
@@ -53,183 +67,215 @@
     </form>
 
 
-    {% if salas %}
+    <!-- ================================================= -->
+    <!-- SALAS -->
+    <!-- Só aparecem depois da consulta -->
+    <!-- ================================================= -->
 
-    <hr class="my-4">
+    {% if request.method == 'POST' and salas %}
 
-    <form
-        action="{{ url_for('confirmar') }}"
-        method="POST"
-    >
+        <hr class="my-4">
 
-        <input
-            type="hidden"
-            name="data"
-            value="{{ data }}"
+
+        <form
+            action="{{ url_for('confirmar') }}"
+            method="POST"
         >
 
-        <input
-            type="hidden"
-            name="qtd"
-            value="{{ qtd }}"
-        >
+            <input
+                type="hidden"
+                name="data"
+                value="{{ data }}"
+            >
+
+            <input
+                type="hidden"
+                name="qtd"
+                value="{{ qtd }}"
+            >
 
 
-        <!-- SALAS -->
+            <!-- SALAS -->
 
-        <div class="mb-3">
+            <div class="mb-3">
 
-            <label class="form-label fw-bold">
-                Selecione a sala
-            </label>
+                <label class="form-label fw-bold">
+                    Selecione a sala
+                </label>
 
-            {% for s in salas %}
 
-            <div class="border rounded p-3 mb-2">
+                {% for s in salas %}
 
-                <div class="form-check">
+                    <div class="border rounded p-3 mb-2">
+
+                        <div class="form-check">
+
+                            <input
+                                class="form-check-input"
+                                type="radio"
+                                name="sala_id"
+                                value="{{ s.id }}"
+                                id="sala{{ s.id }}"
+                                required
+                            >
+
+                            <label
+                                class="form-check-label"
+                                for="sala{{ s.id }}"
+                            >
+
+                                <strong>
+                                    {{ s.nome }}
+                                </strong>
+
+                                <br>
+
+                                <small class="text-muted">
+                                    Capacidade:
+                                    {{ s.capacidade }}
+                                    pessoas
+                                </small>
+
+                            </label>
+
+                        </div>
+
+                    </div>
+
+                {% endfor %}
+
+            </div>
+
+
+            <!-- ================================================= -->
+            <!-- HORÁRIOS -->
+            <!-- ================================================= -->
+
+            <div class="row mb-3">
+
+                <div class="col-md-6 mb-2">
+
+                    <label class="form-label">
+                        Horário de início
+                    </label>
 
                     <input
-                        class="form-check-input"
-                        type="radio"
-                        name="sala_id"
-                        value="{{ s.id }}"
-                        id="sala{{ s.id }}"
+                        type="time"
+                        name="h_inicio"
+                        class="form-control"
+                        max="21:59"
                         required
                     >
 
-                    <label
-                        class="form-check-label"
-                        for="sala{{ s.id }}"
-                    >
+                </div>
 
-                        <strong>
-                            {{ s.nome }}
-                        </strong>
 
-                        <br>
+                <div class="col-md-6 mb-2">
 
-                        <small class="text-muted">
-                            Capacidade: {{ s.capacidade }} pessoas
-                        </small>
-
+                    <label class="form-label">
+                        Horário de término
                     </label>
+
+                    <input
+                        type="time"
+                        name="h_fim"
+                        class="form-control"
+                        max="22:00"
+                        required
+                    >
 
                 </div>
 
             </div>
 
-            {% endfor %}
 
-        </div>
+            <div class="form-text mb-3">
+                O funcionamento das salas encerra-se às 22h.
+            </div>
 
 
-        <!-- HORÁRIOS -->
+            <!-- ================================================= -->
+            <!-- OBSERVAÇÃO -->
+            <!-- ================================================= -->
 
-        <div class="row mb-3">
+            <div class="mb-3">
 
-            <div class="col-md-6 mb-2">
-
-                <label class="form-label">
-                    Horário de início
-                </label>
-
-                <input
-                    type="time"
-                    name="h_inicio"
-                    class="form-control"
-                    max="21:59"
-                    required
+                <label
+                    for="observacao"
+                    class="form-label"
                 >
 
-            </div>
+                    Observação
 
-            <div class="col-md-6 mb-2">
+                    <span class="text-muted">
+                        (opcional)
+                    </span>
 
-                <label class="form-label">
-                    Horário de término
                 </label>
 
-                <input
-                    type="time"
-                    name="h_fim"
+
+                <textarea
+                    name="observacao"
+                    id="observacao"
                     class="form-control"
-                    max="22:00"
-                    required
+                    rows="3"
+                    maxlength="1000"
+                    placeholder="Informe alguma necessidade ou informação importante para a Secretaria."
+                ></textarea>
+
+
+                <div class="form-text">
+
+                    Ex.: necessidade de projetor,
+                    disposição das cadeiras,
+                    acesso antecipado à sala etc.
+
+                </div>
+
+            </div>
+
+
+            <!-- ================================================= -->
+            <!-- RECORRÊNCIA -->
+            <!-- ================================================= -->
+
+            <div class="form-check mb-3">
+
+                <input
+                    type="checkbox"
+                    name="recorrente"
+                    value="sim"
+                    class="form-check-input"
+                    id="recorrente"
                 >
 
+
+                <label
+                    class="form-check-label"
+                    for="recorrente"
+                >
+
+                    Repetir semanalmente até o fim do ano
+
+                </label>
+
             </div>
 
-        </div>
 
-        <div class="form-text mb-3">
-            O funcionamento das salas encerra-se às 22h.
-        </div>
+            <!-- ================================================= -->
+            <!-- BOTÃO FINAL -->
+            <!-- ================================================= -->
 
-
-        <!-- OBSERVAÇÃO -->
-
-        <div class="mb-3">
-
-            <label
-                for="observacao"
-                class="form-label"
-            >
-                Observação
-                <span class="text-muted">
-                    (opcional)
-                </span>
-            </label>
-
-            <textarea
-                name="observacao"
-                id="observacao"
-                class="form-control"
-                rows="3"
-                maxlength="1000"
-                placeholder="Informe alguma necessidade ou informação importante para a Secretaria."
-            ></textarea>
-
-            <div class="form-text">
-                Ex.: necessidade de projetor, disposição das cadeiras,
-                acesso antecipado à sala etc.
-            </div>
-
-        </div>
-
-
-        <!-- RECORRÊNCIA -->
-
-        <div class="form-check mb-3">
-
-            <input
-                type="checkbox"
-                name="recorrente"
-                value="sim"
-                class="form-check-input"
-                id="recorrente"
+            <button
+                type="submit"
+                class="btn btn-primary w-100"
             >
 
-            <label
-                class="form-check-label"
-                for="recorrente"
-            >
-                Repetir semanalmente até o fim do ano
-            </label>
+                Finalizar Pré-agendamento
 
-        </div>
+            </button>
 
-
-        <!-- BOTÃO -->
-
-        <button
-            type="submit"
-            class="btn btn-primary w-100"
-        >
-            Finalizar Pré-agendamento
-        </button>
-
-    </form>
+        </form>
 
     {% endif %}
 
