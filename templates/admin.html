@@ -32,9 +32,12 @@ tbody tr:hover{background:#fcfcfc}
 .status.pendente{background:#fff3cd;color:#8a6500}.status.aprovado{background:#e4f5ea;color:var(--verde)}
 .status.reprovado{background:#f8e1e4;color:#9d2638}.status.admin{background:var(--dourado-claro);color:#725900}
 .status.usuario{background:var(--vermelho-claro);color:var(--vermelho-escuro)}
-.acoes-reserva{display:flex;gap:7px;flex-wrap:wrap}
+.status.bloqueado{background:#f8e1e4;color:#9d2638}
+.acoes-reserva,.acoes-usuario{display:flex;gap:7px;flex-wrap:wrap}
 .botao-acao{border:0;border-radius:7px;padding:7px 10px;font-size:12px;font-weight:bold;cursor:pointer}
 .aprovar{background:#e4f5ea;color:var(--verde)}.reprovar{background:#f8e1e4;color:#9d2638}
+.bloquear{background:#f8e1e4;color:#9d2638}.desbloquear{background:#e4f5ea;color:var(--verde)}
+.botao-acao:disabled{opacity:.55;cursor:not-allowed}
 .vazio{padding:28px 20px;text-align:center;color:var(--cinza)}
 .nome-usuario{font-weight:bold;color:#333}.email{color:#666;word-break:break-word}
 .numero-reservas{display:inline-flex;min-width:34px;height:30px;padding:0 9px;align-items:center;justify-content:center;border-radius:999px;background:var(--vermelho-claro);color:var(--vermelho-escuro);font-weight:bold}
@@ -126,7 +129,7 @@ tbody tr:hover{background:#fcfcfc}
 {% if usuarios %}
 <div class="tabela-wrapper">
 <table>
-<thead><tr><th>Nome</th><th>E-mail</th><th>Tipo de usuário</th><th>Reservas</th></tr></thead>
+<thead><tr><th>Nome</th><th>E-mail</th><th>Tipo de usuário</th><th>Status</th><th>Reservas</th><th>Ação</th></tr></thead>
 <tbody>
 {% for usuario in usuarios %}
 <tr>
@@ -136,7 +139,24 @@ tbody tr:hover{background:#fcfcfc}
 {% if usuario.is_admin %}<span class="status admin">Administrador</span>
 {% else %}<span class="status usuario">Usuário</span>{% endif %}
 </td>
+<td>
+{% if usuario.ativo %}<span class="status aprovado">Ativo</span>
+{% else %}<span class="status bloqueado">Bloqueado</span>{% endif %}
+</td>
 <td><span class="numero-reservas">{{ usuario.reservas|length }}</span></td>
+<td>
+{% if usuario.is_admin %}
+<span class="badge dourado">Protegido</span>
+{% else %}
+<form method="POST" action="{{ url_for('alternar_usuario', id=usuario.id) }}" onsubmit="return confirmarUsuario('{{ usuario.ativo }}');">
+{% if usuario.ativo %}
+<button type="submit" class="botao-acao bloquear">Bloquear</button>
+{% else %}
+<button type="submit" class="botao-acao desbloquear">Desbloquear</button>
+{% endif %}
+</form>
+{% endif %}
+</td>
 </tr>
 {% endfor %}
 </tbody>
@@ -153,6 +173,14 @@ tbody tr:hover{background:#fcfcfc}
 <script>
 function confirmarAprovacao(){return confirm("Deseja realmente aprovar esta reserva?");}
 function confirmarReprovacao(){return confirm("Deseja realmente reprovar esta reserva?");}
+
+function confirmarUsuario(ativo){
+    if (ativo === "True") {
+        return confirm("Deseja realmente bloquear este usuário? Ele não poderá mais entrar no sistema enquanto estiver bloqueado.");
+    }
+
+    return confirm("Deseja realmente desbloquear este usuário?");
+}
 </script>
 </body>
 </html>
