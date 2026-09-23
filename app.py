@@ -359,39 +359,110 @@ def setup_db():
         )
 
     # --------------------------------------------------------
-    # SALAS
+    # SALAS OFICIAIS
     # --------------------------------------------------------
 
-    if Sala.query.count() == 0:
+    salas_oficiais = [
+        ("Auditório São Judas Tadeu", 250),
+        ("Salão Novo", 100),
+        ("Sala Nova 1", 15),
+        ("Sala Nova 2", 15),
+        ("Sala da Catequese 01", 20),
+        ("Sala da Catequese 02", 20),
+        ("Sala da Catequese 03", 20),
+        ("Sala da Catequese 04", 20),
+        ("Galpão", 60),
+        ("Sala de baixo da escada do palco 1", 20),
+        ("Sala de baixo da escada 2", 20),
+        ("Salas da Catequese 2", 7),
+    ]
 
-        salas_iniciais = [
+    # --------------------------------------------------------
+    # MIGRAÇÃO ÚNICA DAS SALAS ANTIGAS
+    #
+    # Se alguma das salas antigas ainda existir no banco,
+    # todas as reservas e salas antigas são removidas uma única
+    # vez e as salas oficiais são cadastradas.
+    # Depois que a migração ocorrer, esta condição não volta a
+    # ser verdadeira.
+    # --------------------------------------------------------
 
-            Sala(
-                nome="Sala Catequese 01",
-                capacidade=15
-            ),
+    nomes_salas_antigas = {
+        "Sala Catequese 01",
+        "Sala Reuniões 02",
+        "Auditório São Judas",
+    }
 
-            Sala(
-                nome="Sala Reuniões 02",
-                capacidade=35
-            ),
+    salas_existentes = Sala.query.all()
 
-            Sala(
-                nome="Auditório São Judas",
-                capacidade=100
-            )
+    existe_sala_antiga = any(
+        sala.nome in nomes_salas_antigas
+        for sala in salas_existentes
+    )
 
-        ]
+    if existe_sala_antiga:
 
-        db.session.add_all(
-            salas_iniciais
+        print(
+            "Salas antigas encontradas. "
+            "Iniciando migração para as salas oficiais..."
+        )
+
+        # As reservas antigas foram autorizadas a ser removidas
+        # para que a nova estrutura de salas seja implantada.
+        Reserva.query.delete(
+            synchronize_session=False
+        )
+
+        Sala.query.delete(
+            synchronize_session=False
         )
 
         db.session.commit()
 
         print(
-            "Salas iniciais cadastradas."
+            "Reservas e salas antigas removidas."
         )
+
+    # --------------------------------------------------------
+    # CADASTRO / ATUALIZAÇÃO DAS SALAS OFICIAIS
+    # --------------------------------------------------------
+
+    for nome, capacidade in salas_oficiais:
+
+        sala = Sala.query.filter_by(
+            nome=nome
+        ).first()
+
+        if sala:
+
+            if sala.capacidade != capacidade:
+
+                sala.capacidade = capacidade
+
+                print(
+                    f"Capacidade atualizada: "
+                    f"{nome} -> {capacidade} pessoas."
+                )
+
+        else:
+
+            db.session.add(
+                Sala(
+                    nome=nome,
+                    capacidade=capacidade
+                )
+            )
+
+            print(
+                f"Sala cadastrada: "
+                f"{nome} -> {capacidade} pessoas."
+            )
+
+    db.session.commit()
+
+    print(
+        "Salas oficiais configuradas com sucesso."
+    )
 
     print(
         "Configuração do banco concluída."
