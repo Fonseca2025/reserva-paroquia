@@ -18,6 +18,74 @@
     </div>
 
 
+    <!-- =====================================================
+         FILTRO POR DATA
+         ===================================================== -->
+
+    <div class="card mb-4">
+
+        <div class="card-body">
+
+            <form
+                method="GET"
+                action="{{ url_for('agenda') }}"
+                class="row g-3 align-items-end"
+            >
+
+                <div class="col-md-5">
+
+                    <label
+                        for="data"
+                        class="form-label"
+                    >
+                        Consultar reservas por data
+                    </label>
+
+                    <input
+                        type="date"
+                        id="data"
+                        name="data"
+                        class="form-control"
+                        value="{{ data_filtro }}"
+                    >
+
+                </div>
+
+
+                <div class="col-md-auto">
+
+                    <button
+                        type="submit"
+                        class="btn btn-primary"
+                    >
+                        Consultar
+                    </button>
+
+                </div>
+
+
+                <div class="col-md-auto">
+
+                    <a
+                        href="{{ url_for('agenda') }}"
+                        class="btn btn-outline-secondary"
+                    >
+                        Mostrar todas
+                    </a>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+
+    <!-- =====================================================
+         TABELA DE RESERVAS
+         ===================================================== -->
+
     {% if reservas %}
 
     <div class="table-responsive">
@@ -37,6 +105,7 @@
                 </tr>
 
             </thead>
+
 
             <tbody>
 
@@ -67,11 +136,19 @@
                     </td>
 
                     <td>
+
                         {% if reserva.observacao %}
+
                             {{ reserva.observacao }}
+
                         {% else %}
-                            <span class="text-muted">—</span>
+
+                            <span class="text-muted">
+                                —
+                            </span>
+
                         {% endif %}
+
                     </td>
 
                     <td>
@@ -116,7 +193,7 @@
 
         <br>
 
-        Ainda não existem reservas cadastradas no sistema.
+        Não existem reservas para a data selecionada.
 
     </div>
 
