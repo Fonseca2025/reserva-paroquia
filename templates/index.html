@@ -1,19 +1,535 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="text-center py-5">
-    <h1 class="display-4" style="color: var(--verde-paroquia);">Paróquia São Judas Tadeu</h1>
-    <p class="lead">Sistema de Pré-agendamento de Salas e Auditório</p>
-    <hr class="my-4">
-    
-    {% if current_user.is_authenticated %}
-        <h3 class="mb-4">Olá, {{ current_user.username }}!</h3>
-        <a class="btn btn-primary btn-lg px-5" href="/solicitar" role="button">Solicitar Reserva</a>
-    {% else %}
-        <div class="d-grid gap-3 d-md-block">
-            <a class="btn btn-primary btn-lg px-5" href="/login">Fazer Login</a>
-            <a class="btn btn-outline-dark btn-lg px-5" href="/cadastro">Criar Conta</a>
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>
+        Reserva de Salas - Paróquia São Judas Tadeu
+    </title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+
+            font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
+
+            background: #f4f6f8;
+
+            color: #333;
+
+            min-height: 100vh;
+        }
+
+
+        /* ================================================= */
+        /* CONTAINER */
+        /* ================================================= */
+
+        .container {
+
+            width: 92%;
+
+            max-width: 1000px;
+
+            margin: 0 auto;
+
+            padding: 30px 0 50px;
+        }
+
+
+        /* ================================================= */
+        /* CABEÇALHO */
+        /* ================================================= */
+
+        .topo {
+
+            text-align: center;
+
+            margin-bottom: 30px;
+        }
+
+        .topo h1 {
+
+            margin: 0;
+
+            color: #333;
+
+            font-size: 32px;
+        }
+
+        .topo p {
+
+            margin-top: 10px;
+
+            color: #666;
+
+            font-size: 16px;
+
+            line-height: 1.5;
+        }
+
+
+        /* ================================================= */
+        /* MENSAGENS */
+        /* ================================================= */
+
+        .mensagem {
+
+            padding: 14px 18px;
+
+            border-radius: 8px;
+
+            margin-bottom: 20px;
+
+            font-weight: bold;
+        }
+
+        .mensagem.success {
+
+            background: #d1e7dd;
+
+            color: #0f5132;
+
+            border: 1px solid #badbcc;
+        }
+
+        .mensagem.danger {
+
+            background: #f8d7da;
+
+            color: #842029;
+
+            border: 1px solid #f5c2c7;
+        }
+
+        .mensagem.warning {
+
+            background: #fff3cd;
+
+            color: #664d03;
+
+            border: 1px solid #ffecb5;
+        }
+
+
+        /* ================================================= */
+        /* CARD PRINCIPAL */
+        /* ================================================= */
+
+        .card {
+
+            background: white;
+
+            border-radius: 14px;
+
+            padding: 30px;
+
+            box-shadow:
+                0 3px 12px
+                rgba(0, 0, 0, 0.08);
+
+            margin-bottom: 25px;
+        }
+
+        .card h2 {
+
+            margin-top: 0;
+
+            margin-bottom: 10px;
+
+            text-align: center;
+        }
+
+        .card p {
+
+            color: #666;
+
+            line-height: 1.6;
+
+            text-align: center;
+        }
+
+
+        /* ================================================= */
+        /* BOTÕES */
+        /* ================================================= */
+
+        .botoes {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(auto-fit, minmax(220px, 1fr));
+
+            gap: 15px;
+
+            margin-top: 25px;
+        }
+
+        .btn {
+
+            display: block;
+
+            width: 100%;
+
+            padding: 14px 18px;
+
+            border-radius: 8px;
+
+            text-decoration: none;
+
+            text-align: center;
+
+            font-weight: bold;
+
+            font-size: 15px;
+
+            transition: 0.2s;
+        }
+
+        .btn:hover {
+
+            opacity: 0.88;
+
+            transform: translateY(-1px);
+        }
+
+        .btn-reservar {
+
+            background: #198754;
+
+            color: white;
+        }
+
+        .btn-login {
+
+            background: #343a40;
+
+            color: white;
+        }
+
+        .btn-cadastro {
+
+            background: #6c757d;
+
+            color: white;
+        }
+
+        .btn-agenda {
+
+            background: #0d6efd;
+
+            color: white;
+        }
+
+
+        /* ================================================= */
+        /* INFORMAÇÕES */
+        /* ================================================= */
+
+        .informacoes {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(auto-fit, minmax(220px, 1fr));
+
+            gap: 15px;
+
+            margin-top: 25px;
+        }
+
+        .informacao {
+
+            background: #f8f9fa;
+
+            border-radius: 10px;
+
+            padding: 18px;
+
+            border: 1px solid #e9ecef;
+        }
+
+        .informacao h3 {
+
+            margin-top: 0;
+
+            margin-bottom: 8px;
+
+            font-size: 17px;
+        }
+
+        .informacao p {
+
+            margin: 0;
+
+            text-align: left;
+
+            font-size: 14px;
+        }
+
+
+        /* ================================================= */
+        /* RODAPÉ */
+        /* ================================================= */
+
+        .rodape {
+
+            text-align: center;
+
+            color: #888;
+
+            font-size: 13px;
+
+            margin-top: 25px;
+        }
+
+
+        /* ================================================= */
+        /* RESPONSIVO */
+        /* ================================================= */
+
+        @media (max-width: 600px) {
+
+            .container {
+
+                width: 94%;
+
+                padding-top: 20px;
+            }
+
+            .topo h1 {
+
+                font-size: 25px;
+            }
+
+            .card {
+
+                padding: 22px 18px;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+<div class="container">
+
+
+    <!-- ================================================= -->
+    <!-- CABEÇALHO -->
+    <!-- ================================================= -->
+
+    <div class="topo">
+
+        <h1>
+            Reserva de Salas
+        </h1>
+
+        <p>
+            Paróquia São Judas Tadeu
+        </p>
+
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- MENSAGENS -->
+    <!-- ================================================= -->
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+
+        {% if messages %}
+
+            {% for category, message in messages %}
+
+                <div class="mensagem {{ category }}">
+                    {{ message }}
+                </div>
+
+            {% endfor %}
+
+        {% endif %}
+
+    {% endwith %}
+
+
+    <!-- ================================================= -->
+    <!-- CARD PRINCIPAL -->
+    <!-- ================================================= -->
+
+    <div class="card">
+
+        {% if current_user.is_authenticated %}
+
+            <h2>
+                Olá, {{ current_user.username }}!
+            </h2>
+
+            <p>
+                Escolha uma das opções abaixo para
+                continuar.
+            </p>
+
+            <div class="botoes">
+
+                <a
+                    href="{{ url_for('solicitar') }}"
+                    class="btn btn-reservar"
+                >
+                    Solicitar reserva
+                </a>
+
+                {% if current_user.is_admin %}
+
+                    <a
+                        href="{{ url_for('admin') }}"
+                        class="btn btn-login"
+                    >
+                        Administração
+                    </a>
+
+                    <a
+                        href="{{ url_for('agenda') }}"
+                        class="btn btn-agenda"
+                    >
+                        Ver agenda
+                    </a>
+
+                {% endif %}
+
+                <a
+                    href="{{ url_for('logout') }}"
+                    class="btn btn-cadastro"
+                >
+                    Sair
+                </a>
+
+            </div>
+
+        {% else %}
+
+            <h2>
+                Bem-vindo!
+            </h2>
+
+            <p>
+                Este sistema permite solicitar a utilização
+                dos espaços da Paróquia São Judas Tadeu.
+            </p>
+
+            <div class="botoes">
+
+                <a
+                    href="{{ url_for('login') }}"
+                    class="btn btn-login"
+                >
+                    Entrar
+                </a>
+
+                <a
+                    href="{{ url_for('cadastro') }}"
+                    class="btn btn-cadastro"
+                >
+                    Criar cadastro
+                </a>
+
+            </div>
+
+        {% endif %}
+
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- INFORMAÇÕES -->
+    <!-- ================================================= -->
+
+    <div class="card">
+
+        <h2>
+            Informações
+        </h2>
+
+        <div class="informacoes">
+
+            <div class="informacao">
+
+                <h3>
+                    📅 Solicitação
+                </h3>
+
+                <p>
+                    Escolha a sala, a data, o horário e
+                    a quantidade de pessoas para solicitar
+                    uma reserva.
+                </p>
+
+            </div>
+
+
+            <div class="informacao">
+
+                <h3>
+                    🕐 Horários
+                </h3>
+
+                <p>
+                    As reservas devem respeitar os horários
+                    disponíveis e terminar até as 22h.
+                </p>
+
+            </div>
+
+
+            <div class="informacao">
+
+                <h3>
+                    ✓ Análise
+                </h3>
+
+                <p>
+                    Toda solicitação fica pendente até
+                    ser analisada pela administração
+                    da paróquia.
+                </p>
+
+            </div>
+
         </div>
-        <p class="mt-4 text-muted">Ainda não tem acesso? Clique em "Criar Conta" para se cadastrar.</p>
-    {% endif %}
+
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- RODAPÉ -->
+    <!-- ================================================= -->
+
+    <div class="rodape">
+
+        Paróquia São Judas Tadeu
+
+    </div>
+
 </div>
-{% endblock %}
+
+</body>
+
+</html>
