@@ -3,184 +3,962 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>Administração — Paróquia São Judas Tadeu</title>
+
 <style>
-:root{--vermelho:#8b1e2d;--vermelho-escuro:#6f1724;--vermelho-claro:#f8e9ec;--dourado:#c9a227;--dourado-claro:#f6efd5;--texto:#2f2f2f;--cinza:#666;--borda:#e2e2e2;--fundo:#f7f7f7;--branco:#fff;--verde:#237a45}
-*{box-sizing:border-box}
-body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--fundo);color:var(--texto)}
-a{color:inherit;text-decoration:none}
-.topo{background:linear-gradient(135deg,var(--vermelho-escuro),var(--vermelho));color:#fff;padding:22px 20px;box-shadow:0 3px 12px rgba(0,0,0,.12)}
-.topo-conteudo{max-width:1250px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:18px}
-.titulo h1{margin:0;font-size:26px}.titulo p{margin:6px 0 0;opacity:.9;font-size:14px}
-.acoes-topo{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end}
-.botao{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:9px 15px;border-radius:8px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.12);color:#fff;font-weight:bold;font-size:14px;cursor:pointer}
-.botao:hover{background:rgba(255,255,255,.22)}
-.botao.dourado{background:var(--dourado);border-color:var(--dourado)}
-.container{width:min(1250px,calc(100% - 30px));margin:24px auto 45px}
-.cartao{background:#fff;border:1px solid var(--borda);border-radius:14px;box-shadow:0 4px 16px rgba(0,0,0,.06);margin-bottom:24px;overflow:hidden}
-.cabecalho-cartao{padding:18px 20px;border-bottom:1px solid var(--borda);display:flex;align-items:center;justify-content:space-between;gap:12px}
-.cabecalho-cartao h2{margin:0;font-size:20px;color:var(--vermelho-escuro)}
-.cabecalho-cartao p{margin:5px 0 0;color:var(--cinza);font-size:13px}
-.resumo{display:flex;gap:8px;flex-wrap:wrap}.badge{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:bold;background:var(--vermelho-claro);color:var(--vermelho-escuro)}
-.badge.dourado{background:var(--dourado-claro);color:#745c00}
-.tabela-wrapper{width:100%;overflow-x:auto}
-table{width:100%;border-collapse:collapse;min-width:900px}
-th,td{padding:13px 14px;border-bottom:1px solid #eee;text-align:left;vertical-align:middle;font-size:14px}
-th{background:#fafafa;color:#555;font-size:12px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
-tbody tr:hover{background:#fcfcfc}
-.status{display:inline-block;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:bold;white-space:nowrap}
-.status.pendente{background:#fff3cd;color:#8a6500}.status.aprovado{background:#e4f5ea;color:var(--verde)}
-.status.reprovado{background:#f8e1e4;color:#9d2638}.status.admin{background:var(--dourado-claro);color:#725900}
-.status.usuario{background:var(--vermelho-claro);color:var(--vermelho-escuro)}
-.status.bloqueado{background:#f8e1e4;color:#9d2638}
-.acoes-reserva,.acoes-usuario{display:flex;gap:7px;flex-wrap:wrap}
-.botao-acao{border:0;border-radius:7px;padding:7px 10px;font-size:12px;font-weight:bold;cursor:pointer}
-.aprovar{background:#e4f5ea;color:var(--verde)}.reprovar{background:#f8e1e4;color:#9d2638}
-.bloquear{background:#f8e1e4;color:#9d2638}.desbloquear{background:#e4f5ea;color:var(--verde)}
-.botao-acao:disabled{opacity:.55;cursor:not-allowed}
-.vazio{padding:28px 20px;text-align:center;color:var(--cinza)}
-.nome-usuario{font-weight:bold;color:#333}.email{color:#666;word-break:break-word}
-.numero-reservas{display:inline-flex;min-width:34px;height:30px;padding:0 9px;align-items:center;justify-content:center;border-radius:999px;background:var(--vermelho-claro);color:var(--vermelho-escuro);font-weight:bold}
-.observacao{max-width:280px;white-space:normal;color:#555}.rodape{text-align:center;color:#777;font-size:12px;margin-top:25px}
-@media(max-width:800px){.topo-conteudo{align-items:flex-start;flex-direction:column}.acoes-topo{width:100%;justify-content:flex-start}.botao{flex:1 1 auto}.container{width:min(100% - 20px,1250px);margin-top:15px}.cabecalho-cartao{align-items:flex-start;flex-direction:column}}
-@media(max-width:560px){.topo{padding:18px 15px}.titulo h1{font-size:21px}.titulo p{font-size:13px}.acoes-topo{display:grid;grid-template-columns:1fr 1fr;width:100%}.botao{width:100%;font-size:13px;padding:9px 8px}.cabecalho-cartao{padding:15px}.cabecalho-cartao h2{font-size:18px}th,td{padding:11px 10px;font-size:13px}}
+:root{
+    --vermelho:#8b1e2d;
+    --vermelho-escuro:#6f1724;
+    --vermelho-claro:#f8e9ec;
+    --dourado:#c9a227;
+    --dourado-claro:#f6efd5;
+    --texto:#2f2f2f;
+    --cinza:#666;
+    --borda:#e2e2e2;
+    --fundo:#f7f7f7;
+    --branco:#fff;
+    --verde:#237a45;
+    --verde-claro:#e4f5ea;
+}
+
+*{
+    box-sizing:border-box;
+}
+
+body{
+    margin:0;
+    font-family:Arial,Helvetica,sans-serif;
+    background:var(--fundo);
+    color:var(--texto);
+}
+
+a{
+    color:inherit;
+    text-decoration:none;
+}
+
+/* =========================
+   TOPO
+========================= */
+
+.topo{
+    background:linear-gradient(
+        135deg,
+        var(--vermelho-escuro),
+        var(--vermelho)
+    );
+    color:#fff;
+    padding:22px 20px;
+    box-shadow:0 3px 12px rgba(0,0,0,.12);
+}
+
+.topo-conteudo{
+    max-width:1250px;
+    margin:auto;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:18px;
+}
+
+.titulo h1{
+    margin:0;
+    font-size:26px;
+}
+
+.titulo p{
+    margin:6px 0 0;
+    opacity:.9;
+    font-size:14px;
+}
+
+.acoes-topo{
+    display:flex;
+    gap:9px;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+}
+
+.botao{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:40px;
+    padding:9px 15px;
+    border-radius:8px;
+    border:1px solid rgba(255,255,255,.35);
+    background:rgba(255,255,255,.12);
+    color:#fff;
+    font-weight:bold;
+    font-size:14px;
+    cursor:pointer;
+    transition:.2s;
+}
+
+.botao:hover{
+    background:rgba(255,255,255,.22);
+}
+
+.botao.dourado{
+    background:var(--dourado);
+    border-color:var(--dourado);
+}
+
+.botao.dourado:hover{
+    background:#b38e16;
+}
+
+/* =========================
+   CONTAINER
+========================= */
+
+.container{
+    width:min(1250px,calc(100% - 30px));
+    margin:24px auto 45px;
+}
+
+/* =========================
+   CARTÕES
+========================= */
+
+.cartao{
+    background:#fff;
+    border:1px solid var(--borda);
+    border-radius:14px;
+    box-shadow:0 4px 16px rgba(0,0,0,.06);
+    margin-bottom:24px;
+    overflow:hidden;
+}
+
+.cabecalho-cartao{
+    padding:20px;
+    border-bottom:1px solid var(--borda);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:15px;
+}
+
+.cabecalho-cartao h2{
+    margin:0;
+    font-size:20px;
+    color:var(--vermelho-escuro);
+}
+
+.cabecalho-cartao p{
+    margin:6px 0 0;
+    color:var(--cinza);
+    font-size:13px;
+}
+
+.resumo{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+}
+
+.badge{
+    display:inline-flex;
+    align-items:center;
+    padding:6px 11px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:bold;
+    background:var(--vermelho-claro);
+    color:var(--vermelho-escuro);
+    white-space:nowrap;
+}
+
+.badge.dourado{
+    background:var(--dourado-claro);
+    color:#745c00;
+}
+
+/* =========================
+   TÍTULO DAS SEÇÕES
+========================= */
+
+.titulo-secao{
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+
+.icone-secao{
+    width:38px;
+    height:38px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:10px;
+    background:var(--vermelho-claro);
+    font-size:19px;
+}
+
+.titulo-secao-texto{
+    min-width:0;
+}
+
+/* =========================
+   TABELAS
+========================= */
+
+.tabela-wrapper{
+    width:100%;
+    overflow-x:auto;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    min-width:900px;
+}
+
+th,
+td{
+    padding:13px 14px;
+    border-bottom:1px solid #eee;
+    text-align:left;
+    vertical-align:middle;
+    font-size:14px;
+}
+
+th{
+    background:#fafafa;
+    color:#555;
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:.03em;
+    white-space:nowrap;
+}
+
+tbody tr:hover{
+    background:#fcfcfc;
+}
+
+/* =========================
+   STATUS
+========================= */
+
+.status{
+    display:inline-block;
+    padding:6px 10px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:bold;
+    white-space:nowrap;
+}
+
+.status.pendente{
+    background:#fff3cd;
+    color:#8a6500;
+}
+
+.status.aprovado{
+    background:var(--verde-claro);
+    color:var(--verde);
+}
+
+.status.reprovado{
+    background:#f8e1e4;
+    color:#9d2638;
+}
+
+.status.admin{
+    background:var(--dourado-claro);
+    color:#725900;
+}
+
+.status.usuario{
+    background:var(--vermelho-claro);
+    color:var(--vermelho-escuro);
+}
+
+.status.bloqueado{
+    background:#f8e1e4;
+    color:#9d2638;
+}
+
+/* =========================
+   AÇÕES
+========================= */
+
+.acoes-reserva,
+.acoes-usuario{
+    display:flex;
+    gap:7px;
+    flex-wrap:wrap;
+}
+
+.botao-acao{
+    border:0;
+    border-radius:7px;
+    padding:7px 10px;
+    font-size:12px;
+    font-weight:bold;
+    cursor:pointer;
+    transition:.2s;
+}
+
+.botao-acao:hover{
+    transform:translateY(-1px);
+}
+
+.aprovar{
+    background:#e4f5ea;
+    color:var(--verde);
+}
+
+.reprovar{
+    background:#f8e1e4;
+    color:#9d2638;
+}
+
+.bloquear{
+    background:#f8e1e4;
+    color:#9d2638;
+}
+
+.desbloquear{
+    background:#e4f5ea;
+    color:var(--verde);
+}
+
+.botao-acao:disabled{
+    opacity:.55;
+    cursor:not-allowed;
+}
+
+/* =========================
+   USUÁRIOS
+========================= */
+
+.nome-usuario{
+    font-weight:bold;
+    color:#333;
+}
+
+.email{
+    color:#666;
+    word-break:break-word;
+}
+
+.numero-reservas{
+    display:inline-flex;
+    min-width:34px;
+    height:30px;
+    padding:0 9px;
+    align-items:center;
+    justify-content:center;
+    border-radius:999px;
+    background:var(--vermelho-claro);
+    color:var(--vermelho-escuro);
+    font-weight:bold;
+}
+
+.observacao{
+    max-width:280px;
+    white-space:normal;
+    color:#555;
+}
+
+/* =========================
+   RODAPÉ / VAZIO
+========================= */
+
+.vazio{
+    padding:32px 20px;
+    text-align:center;
+    color:var(--cinza);
+}
+
+.rodape{
+    text-align:center;
+    color:#777;
+    font-size:12px;
+    margin-top:25px;
+}
+
+/* =========================
+   RESPONSIVIDADE
+========================= */
+
+@media(max-width:800px){
+
+    .topo-conteudo{
+        align-items:flex-start;
+        flex-direction:column;
+    }
+
+    .acoes-topo{
+        width:100%;
+        justify-content:flex-start;
+    }
+
+    .botao{
+        flex:1 1 auto;
+    }
+
+    .container{
+        width:min(100% - 20px,1250px);
+        margin-top:15px;
+    }
+
+    .cabecalho-cartao{
+        align-items:flex-start;
+        flex-direction:column;
+    }
+
+    .resumo{
+        width:100%;
+    }
+
+    .titulo-secao{
+        width:100%;
+    }
+}
+
+@media(max-width:560px){
+
+    .topo{
+        padding:18px 15px;
+    }
+
+    .titulo h1{
+        font-size:21px;
+    }
+
+    .titulo p{
+        font-size:13px;
+    }
+
+    .acoes-topo{
+        display:grid;
+        grid-template-columns:1fr 1fr;
+        width:100%;
+    }
+
+    .botao{
+        width:100%;
+        font-size:13px;
+        padding:9px 8px;
+    }
+
+    .cabecalho-cartao{
+        padding:15px;
+    }
+
+    .cabecalho-cartao h2{
+        font-size:18px;
+    }
+
+    .icone-secao{
+        width:34px;
+        height:34px;
+        font-size:17px;
+    }
+
+    th,
+    td{
+        padding:11px 10px;
+        font-size:13px;
+    }
+}
 </style>
 </head>
+
 <body>
+
 <header class="topo">
+
 <div class="topo-conteudo">
+
 <div class="titulo">
 <h1>Administração</h1>
 <p>Paróquia São Judas Tadeu — Sistema de Reservas</p>
 </div>
+
 <div class="acoes-topo">
-<a href="{{ url_for('agenda') }}" class="botao">Ver agenda</a>
-<a href="#usuarios" class="botao">Usuários</a>
-<a href="{{ url_for('index') }}" class="botao">Início</a>
-<a href="{{ url_for('logout') }}" class="botao dourado">Sair</a>
+
+<a href="{{ url_for('agenda') }}" class="botao">
+📅 Ver agenda
+</a>
+
+<a href="#reservas" class="botao">
+📋 Reservas
+</a>
+
+<a href="#usuarios" class="botao">
+👥 Usuários
+</a>
+
+<a href="{{ url_for('index') }}" class="botao">
+🏠 Início
+</a>
+
+<a href="{{ url_for('logout') }}" class="botao dourado">
+Sair
+</a>
+
 </div>
+
 </div>
+
 </header>
+
 
 <main class="container">
 
+
+<!-- =====================================================
+     SEÇÃO 1 — SOLICITAÇÕES DE RESERVA
+===================================================== -->
+
 <section class="cartao" id="reservas">
+
 <div class="cabecalho-cartao">
-<div>
-<h2>Reservas</h2>
-<p>Gerencie as solicitações de reserva das salas da paróquia.</p>
+
+<div class="titulo-secao">
+
+<div class="icone-secao">
+📅
 </div>
-<div class="resumo"><span class="badge">Solicitações</span></div>
+
+<div class="titulo-secao-texto">
+
+<h2>Solicitações de reserva</h2>
+
+<p>
+Gerencie as solicitações de reserva das salas da paróquia.
+</p>
+
 </div>
+
+</div>
+
+<div class="resumo">
+
+<span class="badge">
+{{ reservas|length }} reserva{% if reservas|length != 1 %}s{% endif %}
+</span>
+
+</div>
+
+</div>
+
 
 {% if reservas %}
+
 <div class="tabela-wrapper">
+
 <table>
-<thead><tr>
-<th>Data</th><th>Horário</th><th>Sala</th><th>Solicitante</th><th>Pessoas</th><th>Observação</th><th>Status</th><th>Ações</th>
-</tr></thead>
-<tbody>
-{% for reserva in reservas %}
+
+<thead>
+
 <tr>
-<td>{{ reserva.data.strftime('%d/%m/%Y') }}</td>
-<td>{{ reserva.hora_inicio }} às {{ reserva.hora_fim }}</td>
-<td><strong>{{ reserva.sala.nome }}</strong></td>
-<td><div class="nome-usuario">{{ reserva.usuario.username }}</div><div class="email">{{ reserva.usuario.email }}</div></td>
-<td>{{ reserva.qtd_pessoas }}</td>
-<td><div class="observacao">{% if reserva.observacao %}{{ reserva.observacao }}{% else %}—{% endif %}</div></td>
-<td>
-{% if reserva.status == 'Aprovado' %}<span class="status aprovado">Aprovado</span>
-{% elif reserva.status == 'Reprovado' %}<span class="status reprovado">Reprovado</span>
-{% else %}<span class="status pendente">Pendente</span>{% endif %}
-</td>
-<td>
-{% if reserva.status == 'Pendente' %}
-<div class="acoes-reserva">
-<form action="{{ url_for('aprovar', id=reserva.id) }}" method="POST" onsubmit="return confirmarAprovacao();">
-<button type="submit" class="botao-acao aprovar">Aprovar</button>
-</form>
-<form action="{{ url_for('reprovar', id=reserva.id) }}" method="POST" onsubmit="return confirmarReprovacao();">
-<button type="submit" class="botao-acao reprovar">Reprovar</button>
-</form>
-</div>
-{% else %}—{% endif %}
-</td>
+<th>Data</th>
+<th>Horário</th>
+<th>Sala</th>
+<th>Solicitante</th>
+<th>Pessoas</th>
+<th>Observação</th>
+<th>Status</th>
+<th>Ações</th>
 </tr>
-{% endfor %}
-</tbody>
-</table>
+
+</thead>
+
+
+<tbody>
+
+{% for reserva in reservas %}
+
+<tr>
+
+<td>
+{{ reserva.data.strftime('%d/%m/%Y') }}
+</td>
+
+<td>
+{{ reserva.hora_inicio }} às {{ reserva.hora_fim }}
+</td>
+
+<td>
+<strong>{{ reserva.sala.nome }}</strong>
+</td>
+
+<td>
+
+<div class="nome-usuario">
+{{ reserva.usuario.username }}
 </div>
+
+<div class="email">
+{{ reserva.usuario.email }}
+</div>
+
+</td>
+
+<td>
+{{ reserva.qtd_pessoas }}
+</td>
+
+<td>
+
+<div class="observacao">
+
+{% if reserva.observacao %}
+{{ reserva.observacao }}
 {% else %}
-<div class="vazio">Não há reservas cadastradas.</div>
+—
 {% endif %}
+
+</div>
+
+</td>
+
+<td>
+
+{% if reserva.status == 'Aprovado' %}
+
+<span class="status aprovado">
+Aprovado
+</span>
+
+{% elif reserva.status == 'Reprovado' %}
+
+<span class="status reprovado">
+Reprovado
+</span>
+
+{% else %}
+
+<span class="status pendente">
+Pendente
+</span>
+
+{% endif %}
+
+</td>
+
+
+<td>
+
+{% if reserva.status == 'Pendente' %}
+
+<div class="acoes-reserva">
+
+<form
+action="{{ url_for('aprovar', id=reserva.id) }}"
+method="POST"
+onsubmit="return confirmarAprovacao();"
+>
+
+<button
+type="submit"
+class="botao-acao aprovar"
+>
+Aprovar
+</button>
+
+</form>
+
+
+<form
+action="{{ url_for('reprovar', id=reserva.id) }}"
+method="POST"
+onsubmit="return confirmarReprovacao();"
+>
+
+<button
+type="submit"
+class="botao-acao reprovar"
+>
+Reprovar
+</button>
+
+</form>
+
+</div>
+
+{% else %}
+
+—
+
+{% endif %}
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+{% else %}
+
+<div class="vazio">
+
+📭 Não há reservas cadastradas.
+
+</div>
+
+{% endif %}
+
 </section>
+
+
+
+<!-- =====================================================
+     SEÇÃO 2 — USUÁRIOS
+===================================================== -->
 
 <section class="cartao" id="usuarios">
+
 <div class="cabecalho-cartao">
-<div>
+
+<div class="titulo-secao">
+
+<div class="icone-secao">
+👥
+</div>
+
+<div class="titulo-secao-texto">
+
 <h2>Usuários cadastrados</h2>
-<p>Consulte os usuários registrados no sistema e a quantidade de reservas associadas a cada um.</p>
+
+<p>
+Consulte os usuários registrados no sistema e gerencie seu acesso.
+</p>
+
 </div>
+
+</div>
+
+
 <div class="resumo">
-<span class="badge dourado">{{ usuarios|length }} usuário{% if usuarios|length != 1 %}s{% endif %}</span>
+
+<span class="badge dourado">
+
+{{ usuarios|length }}
+usuário{% if usuarios|length != 1 %}s{% endif %}
+
+</span>
+
 </div>
+
 </div>
+
 
 {% if usuarios %}
+
 <div class="tabela-wrapper">
+
 <table>
-<thead><tr><th>Nome</th><th>E-mail</th><th>Tipo de usuário</th><th>Status</th><th>Reservas</th><th>Ação</th></tr></thead>
-<tbody>
-{% for usuario in usuarios %}
+
+<thead>
+
 <tr>
-<td><div class="nome-usuario">{{ usuario.username }}</div></td>
-<td><div class="email">{{ usuario.email }}</div></td>
-<td>
-{% if usuario.is_admin %}<span class="status admin">Administrador</span>
-{% else %}<span class="status usuario">Usuário</span>{% endif %}
-</td>
-<td>
-{% if usuario.ativo %}<span class="status aprovado">Ativo</span>
-{% else %}<span class="status bloqueado">Bloqueado</span>{% endif %}
-</td>
-<td><span class="numero-reservas">{{ usuario.reservas|length }}</span></td>
-<td>
-{% if usuario.is_admin %}
-<span class="badge dourado">Protegido</span>
-{% else %}
-<form method="POST" action="{{ url_for('alternar_usuario', id=usuario.id) }}" onsubmit="return confirmarUsuario('{{ usuario.ativo }}');">
-{% if usuario.ativo %}
-<button type="submit" class="botao-acao bloquear">Bloquear</button>
-{% else %}
-<button type="submit" class="botao-acao desbloquear">Desbloquear</button>
-{% endif %}
-</form>
-{% endif %}
-</td>
+
+<th>Nome</th>
+<th>E-mail</th>
+<th>Tipo de usuário</th>
+<th>Status</th>
+<th>Reservas</th>
+<th>Ação</th>
+
 </tr>
-{% endfor %}
-</tbody>
-</table>
+
+</thead>
+
+
+<tbody>
+
+{% for usuario in usuarios %}
+
+<tr>
+
+<td>
+
+<div class="nome-usuario">
+{{ usuario.username }}
 </div>
+
+</td>
+
+
+<td>
+
+<div class="email">
+{{ usuario.email }}
+</div>
+
+</td>
+
+
+<td>
+
+{% if usuario.is_admin %}
+
+<span class="status admin">
+Administrador
+</span>
+
 {% else %}
-<div class="vazio">Não há usuários cadastrados.</div>
+
+<span class="status usuario">
+Usuário
+</span>
+
 {% endif %}
+
+</td>
+
+
+<td>
+
+{% if usuario.ativo %}
+
+<span class="status aprovado">
+Ativo
+</span>
+
+{% else %}
+
+<span class="status bloqueado">
+Bloqueado
+</span>
+
+{% endif %}
+
+</td>
+
+
+<td>
+
+<span class="numero-reservas">
+{{ usuario.reservas|length }}
+</span>
+
+</td>
+
+
+<td>
+
+{% if usuario.is_admin %}
+
+<span class="badge dourado">
+Protegido
+</span>
+
+{% else %}
+
+<form
+method="POST"
+action="{{ url_for('alternar_usuario', id=usuario.id) }}"
+onsubmit="return confirmarUsuario('{{ usuario.ativo }}');"
+>
+
+{% if usuario.ativo %}
+
+<button
+type="submit"
+class="botao-acao bloquear"
+>
+Bloquear
+</button>
+
+{% else %}
+
+<button
+type="submit"
+class="botao-acao desbloquear"
+>
+Desbloquear
+</button>
+
+{% endif %}
+
+</form>
+
+{% endif %}
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+{% else %}
+
+<div class="vazio">
+
+👤 Não há usuários cadastrados.
+
+</div>
+
+{% endif %}
+
 </section>
 
-<div class="rodape">Paróquia São Judas Tadeu — Administração do sistema de reservas</div>
+
+<div class="rodape">
+
+Paróquia São Judas Tadeu — Administração do sistema de reservas
+
+</div>
+
 </main>
 
+
 <script>
-function confirmarAprovacao(){return confirm("Deseja realmente aprovar esta reserva?");}
-function confirmarReprovacao(){return confirm("Deseja realmente reprovar esta reserva?");}
+
+function confirmarAprovacao(){
+
+    return confirm(
+        "Deseja realmente aprovar esta reserva?"
+    );
+
+}
+
+
+function confirmarReprovacao(){
+
+    return confirm(
+        "Deseja realmente reprovar esta reserva?"
+    );
+
+}
+
 
 function confirmarUsuario(ativo){
-    if (ativo === "True") {
-        return confirm("Deseja realmente bloquear este usuário? Ele não poderá mais entrar no sistema enquanto estiver bloqueado.");
+
+    if (ativo === "True"){
+
+        return confirm(
+            "Deseja realmente bloquear este usuário? Ele não poderá mais entrar no sistema enquanto estiver bloqueado."
+        );
+
     }
 
-    return confirm("Deseja realmente desbloquear este usuário?");
+    return confirm(
+        "Deseja realmente desbloquear este usuário?"
+    );
+
 }
+
 </script>
+
 </body>
 </html>
