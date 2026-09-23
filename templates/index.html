@@ -237,6 +237,149 @@
 
 
         /* ================================================= */
+        /* MINHAS RESERVAS */
+        /* ================================================= */
+
+        .reservas-lista {
+
+            display: grid;
+
+            gap: 15px;
+
+            margin-top: 20px;
+        }
+
+        .reserva {
+
+            background: #f8f9fa;
+
+            border: 1px solid #e9ecef;
+
+            border-radius: 10px;
+
+            padding: 18px;
+        }
+
+        .reserva-cabecalho {
+
+            display: flex;
+
+            justify-content: space-between;
+
+            align-items: center;
+
+            gap: 15px;
+
+            margin-bottom: 12px;
+
+            flex-wrap: wrap;
+        }
+
+        .reserva-cabecalho h3 {
+
+            margin: 0;
+
+            font-size: 17px;
+        }
+
+        .reserva-info {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(auto-fit, minmax(180px, 1fr));
+
+            gap: 10px;
+
+            margin-top: 10px;
+        }
+
+        .reserva-item {
+
+            font-size: 14px;
+
+            color: #555;
+        }
+
+        .reserva-item strong {
+
+            color: #333;
+        }
+
+        .status {
+
+            display: inline-block;
+
+            padding: 6px 10px;
+
+            border-radius: 20px;
+
+            font-size: 13px;
+
+            font-weight: bold;
+
+            white-space: nowrap;
+        }
+
+        .status-pendente {
+
+            background: #fff3cd;
+
+            color: #664d03;
+        }
+
+        .status-aprovado {
+
+            background: #d1e7dd;
+
+            color: #0f5132;
+        }
+
+        .status-reprovado {
+
+            background: #f8d7da;
+
+            color: #842029;
+        }
+
+        .motivo-reprovacao {
+
+            margin-top: 14px;
+
+            padding: 12px 14px;
+
+            background: #f8d7da;
+
+            color: #842029;
+
+            border: 1px solid #f5c2c7;
+
+            border-radius: 8px;
+
+            font-size: 14px;
+
+            line-height: 1.5;
+        }
+
+        .sem-reservas {
+
+            background: #f8f9fa;
+
+            border: 1px dashed #ced4da;
+
+            border-radius: 10px;
+
+            padding: 20px;
+
+            text-align: center;
+
+            color: #666;
+
+            margin-top: 20px;
+        }
+
+
+        /* ================================================= */
         /* INFORMAÇÕES */
         /* ================================================= */
 
@@ -319,6 +462,11 @@
             .card {
 
                 padding: 22px 18px;
+            }
+
+            .reserva-cabecalho {
+
+                align-items: flex-start;
             }
 
         }
@@ -456,6 +604,149 @@
         {% endif %}
 
     </div>
+
+
+    <!-- ================================================= -->
+    <!-- MINHAS RESERVAS -->
+    <!-- ================================================= -->
+
+    {% if current_user.is_authenticated and not current_user.is_admin %}
+
+        <div class="card">
+
+            <h2>
+                Minhas reservas
+            </h2>
+
+            <p>
+                Acompanhe aqui as solicitações de reserva
+                realizadas por você.
+            </p>
+
+            {% if minhas_reservas %}
+
+                <div class="reservas-lista">
+
+                    {% for reserva in minhas_reservas %}
+
+                        <div class="reserva">
+
+                            <div class="reserva-cabecalho">
+
+                                <h3>
+                                    {{ reserva.sala.nome }}
+                                </h3>
+
+                                {% if reserva.status == "Aprovado" %}
+
+                                    <span class="status status-aprovado">
+                                        Aprovado
+                                    </span>
+
+                                {% elif reserva.status == "Reprovado" %}
+
+                                    <span class="status status-reprovado">
+                                        Reprovado
+                                    </span>
+
+                                {% else %}
+
+                                    <span class="status status-pendente">
+                                        Pendente
+                                    </span>
+
+                                {% endif %}
+
+                            </div>
+
+
+                            <div class="reserva-info">
+
+                                <div class="reserva-item">
+
+                                    <strong>
+                                        Data:
+                                    </strong>
+
+                                    {{ reserva.data.strftime('%d/%m/%Y') }}
+
+                                </div>
+
+
+                                <div class="reserva-item">
+
+                                    <strong>
+                                        Horário:
+                                    </strong>
+
+                                    {{ reserva.hora_inicio }}
+                                    às
+                                    {{ reserva.hora_fim }}
+
+                                </div>
+
+
+                                <div class="reserva-item">
+
+                                    <strong>
+                                        Pessoas:
+                                    </strong>
+
+                                    {{ reserva.qtd_pessoas }}
+
+                                </div>
+
+
+                                {% if reserva.observacao %}
+
+                                    <div class="reserva-item">
+
+                                        <strong>
+                                            Observação:
+                                        </strong>
+
+                                        {{ reserva.observacao }}
+
+                                    </div>
+
+                                {% endif %}
+
+                            </div>
+
+
+                            {% if reserva.status == "Reprovado" and reserva.motivo_reprovacao %}
+
+                                <div class="motivo-reprovacao">
+
+                                    <strong>
+                                        Motivo da reprovação:
+                                    </strong>
+
+                                    {{ reserva.motivo_reprovacao }}
+
+                                </div>
+
+                            {% endif %}
+
+                        </div>
+
+                    {% endfor %}
+
+                </div>
+
+            {% else %}
+
+                <div class="sem-reservas">
+
+                    Você ainda não possui nenhuma solicitação de reserva.
+
+                </div>
+
+            {% endif %}
+
+        </div>
+
+    {% endif %}
 
 
     <!-- ================================================= -->
