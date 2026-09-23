@@ -14,12 +14,12 @@ from flask import (
 
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
-    LoginManager,
     UserMixin,
     login_user,
     logout_user,
     login_required,
-    current_user
+    current_user,
+    LoginManager
 )
 
 from flask_bcrypt import Bcrypt
@@ -27,6 +27,7 @@ from sqlalchemy import inspect, text
 
 
 app = Flask(__name__)
+
 
 # ============================================================
 # CONFIGURAÇÕES
@@ -42,8 +43,9 @@ database_url = os.environ.get(
     "sqlite:///paroquia.db"
 )
 
-# Algumas plataformas ainda fornecem postgres://
+# Compatibilidade com URLs antigas do PostgreSQL
 if database_url.startswith("postgres://"):
+
     database_url = database_url.replace(
         "postgres://",
         "postgresql://",
@@ -51,15 +53,22 @@ if database_url.startswith("postgres://"):
     )
 
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 
 db = SQLAlchemy(app)
+
 bcrypt = Bcrypt(app)
 
+
 login_manager = LoginManager(app)
+
 login_manager.login_view = "login"
-login_manager.login_message = "Faça login para acessar esta página."
+
+login_manager.login_message = (
+    "Faça login para acessar esta página."
+)
 
 
 # ============================================================
@@ -237,7 +246,9 @@ def existe_conflito(
     consulta = Reserva.query.filter(
         Reserva.sala_id == sala_id,
         Reserva.data == data_obj,
-        Reserva.status.in_(["Pendente", "Aprovado"]),
+        Reserva.status.in_(
+            ["Pendente", "Aprovado"]
+        ),
         Reserva.hora_inicio < h_fim,
         Reserva.hora_fim > h_inicio
     )
@@ -252,12 +263,14 @@ def existe_conflito(
 
 
 # ============================================================
-# CONFIGURAÇÃO / ATUALIZAÇÃO DO BANCO
+# ATUALIZAÇÃO DA ESTRUTURA DO BANCO
 # ============================================================
 
 def atualizar_estrutura_banco():
 
-    inspector = inspect(db.engine)
+    inspector = inspect(
+        db.engine
+    )
 
     tabelas = inspector.get_table_names()
 
@@ -265,7 +278,9 @@ def atualizar_estrutura_banco():
 
         colunas = [
             coluna["name"]
-            for coluna in inspector.get_columns("reserva")
+            for coluna in inspector.get_columns(
+                "reserva"
+            )
         ]
 
         if "observacao" not in colunas:
@@ -279,6 +294,10 @@ def atualizar_estrutura_banco():
                     )
                 )
 
+
+# ============================================================
+# CONFIGURAÇÃO INICIAL DO BANCO
+# ============================================================
 
 def setup_db():
 
@@ -313,13 +332,18 @@ def setup_db():
         if not admin.is_admin:
 
             admin.is_admin = True
+
             db.session.commit()
 
     else:
 
-        senha_hash = bcrypt.generate_password_hash(
-            admin_password
-        ).decode("utf-8")
+        senha_hash = (
+            bcrypt
+            .generate_password_hash(
+                admin_password
+            )
+            .decode("utf-8")
+        )
 
         admin = User(
             username="Administrador",
@@ -329,6 +353,7 @@ def setup_db():
         )
 
         db.session.add(admin)
+
         db.session.commit()
 
         print(
@@ -361,6 +386,7 @@ def setup_db():
         ]
 
         db.session.add_all(salas)
+
         db.session.commit()
 
         print(
@@ -437,9 +463,13 @@ def cadastro():
                 url_for("cadastro")
             )
 
-        senha_hash = bcrypt.generate_password_hash(
-            password
-        ).decode("utf-8")
+        senha_hash = (
+            bcrypt
+            .generate_password_hash(
+                password
+            )
+            .decode("utf-8")
+        )
 
         novo_usuario = User(
             username=username,
@@ -499,7 +529,9 @@ def login():
             password
         ):
 
-            login_user(usuario)
+            login_user(
+                usuario
+            )
 
             return redirect(
                 url_for("index")
@@ -536,7 +568,7 @@ def logout():
 
 
 # ============================================================
-# SOLICITAÇÃO DE RESERVA
+# SOLICITAR RESERVA
 # ============================================================
 
 @app.route(
@@ -833,7 +865,7 @@ def confirmar():
             )
 
     # --------------------------------------------------------
-    # VERIFICA TODOS OS CONFLITOS ANTES DE CRIAR
+    # VERIFICA CONFLITOS
     # --------------------------------------------------------
 
     for data_reserva in datas_reserva:
@@ -845,8 +877,10 @@ def confirmar():
             hora_fim
         ):
 
-            data_formatada = data_reserva.strftime(
-                "%d/%m/%Y"
+            data_formatada = (
+                data_reserva.strftime(
+                    "%d/%m/%Y"
+                )
             )
 
             flash(
@@ -861,7 +895,7 @@ def confirmar():
             )
 
     # --------------------------------------------------------
-    # CRIA AS RESERVAS
+    # CRIA RESERVAS
     # --------------------------------------------------------
 
     reservas_criadas = []
@@ -890,7 +924,7 @@ def confirmar():
     db.session.commit()
 
     # --------------------------------------------------------
-    # LINK PARA WHATSAPP DA SECRETARIA
+    # WHATSAPP
     # --------------------------------------------------------
 
     whatsapp_numero = os.environ.get(
@@ -900,8 +934,9 @@ def confirmar():
 
     if len(datas_reserva) == 1:
 
-        data_mensagem = datas_reserva[0].strftime(
-            "%d/%m/%Y"
+        data_mensagem = (
+            datas_reserva[0]
+            .strftime("%d/%m/%Y")
         )
 
     else:
@@ -1014,6 +1049,10 @@ def agenda():
             else date.today()
         )
 
+    # --------------------------------------------------------
+    # PRIMEIRO DIA DO MÊS
+    # --------------------------------------------------------
+
     primeiro_dia_mes = date(
         mes_data.year,
         mes_data.month,
@@ -1061,7 +1100,7 @@ def agenda():
         )
 
     # --------------------------------------------------------
-    # RESERVAS DO MÊS
+    # PRIMEIRO DIA DO PRÓXIMO MÊS
     # --------------------------------------------------------
 
     if mes_data.month == 12:
@@ -1080,6 +1119,10 @@ def agenda():
             1
         )
 
+    # --------------------------------------------------------
+    # RESERVAS DO MÊS
+    # --------------------------------------------------------
+
     reservas_mes = Reserva.query.filter(
         Reserva.data >= primeiro_dia_mes,
         Reserva.data < inicio_proximo_mes
@@ -1089,7 +1132,7 @@ def agenda():
     ).all()
 
     # --------------------------------------------------------
-    # DIAS QUE POSSUEM RESERVAS
+    # DIAS COM RESERVA
     # --------------------------------------------------------
 
     dias_com_reserva = sorted(
@@ -1100,7 +1143,7 @@ def agenda():
     )
 
     # --------------------------------------------------------
-    # FILTRO DA LISTA DE RESERVAS
+    # RESERVAS DA LISTA
     # --------------------------------------------------------
 
     consulta = Reserva.query
@@ -1141,17 +1184,36 @@ def agenda():
         f"{mes_data.year}"
     )
 
+    # --------------------------------------------------------
+    # ENVIA OS DADOS PARA O TEMPLATE
+    # --------------------------------------------------------
+
     return render_template(
         "agenda.html",
         reservas=reservas,
         data_filtro=data_str,
-        mes_atual=mes_data.strftime("%Y-%m"),
+
+        mes_atual=mes_data.strftime(
+            "%Y-%m"
+        ),
+
         nome_mes=nome_mes,
-        mes_anterior=mes_anterior.strftime("%Y-%m"),
-        proximo_mes=proximo_mes.strftime("%Y-%m"),
+
+        mes_anterior=mes_anterior.strftime(
+            "%Y-%m"
+        ),
+
+        proximo_mes=proximo_mes.strftime(
+            "%Y-%m"
+        ),
+
         dias_com_reserva=dias_com_reserva,
+
         mes_numero=mes_data.month,
-        ano=mes_data.year
+
+        ano=mes_data.year,
+
+        primeiro_dia_mes=primeiro_dia_mes
     )
 
 
