@@ -361,8 +361,12 @@ def setup_db():
         )
 
     # --------------------------------------------------------
-    # SALAS
+    # SALAS INICIAIS
     # --------------------------------------------------------
+
+    # As salas são criadas somente se o banco ainda não possuir
+    # nenhuma sala. Depois disso, novas salas poderão ser
+    # acrescentadas futuramente sem alterar esta estrutura.
 
     if Sala.query.count() == 0:
 
@@ -1020,6 +1024,60 @@ def agenda():
             )
 
     # --------------------------------------------------------
+    # FILTRO POR SALA
+    # --------------------------------------------------------
+
+    sala_id_str = request.args.get(
+        "sala_id",
+        ""
+    ).strip()
+
+    sala_filtro = None
+
+    if sala_id_str:
+
+        try:
+
+            sala_id = int(
+                sala_id_str
+            )
+
+        except ValueError:
+
+            flash(
+                "Sala inválida.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("agenda")
+            )
+
+        sala_filtro = db.session.get(
+            Sala,
+            sala_id
+        )
+
+        if not sala_filtro:
+
+            flash(
+                "Sala não encontrada.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("agenda")
+            )
+
+    # --------------------------------------------------------
+    # TODAS AS SALAS
+    # --------------------------------------------------------
+
+    salas = Sala.query.order_by(
+        Sala.nome.asc()
+    ).all()
+
+    # --------------------------------------------------------
     # MÊS DO CALENDÁRIO
     # --------------------------------------------------------
 
@@ -1123,10 +1181,18 @@ def agenda():
     # RESERVAS DO MÊS
     # --------------------------------------------------------
 
-    reservas_mes = Reserva.query.filter(
+    consulta_mes = Reserva.query.filter(
         Reserva.data >= primeiro_dia_mes,
         Reserva.data < inicio_proximo_mes
-    ).order_by(
+    )
+
+    if sala_filtro:
+
+        consulta_mes = consulta_mes.filter(
+            Reserva.sala_id == sala_filtro.id
+        )
+
+    reservas_mes = consulta_mes.order_by(
         Reserva.data.asc(),
         Reserva.hora_inicio.asc()
     ).all()
@@ -1152,6 +1218,12 @@ def agenda():
 
         consulta = consulta.filter(
             Reserva.data == data_filtro
+        )
+
+    if sala_filtro:
+
+        consulta = consulta.filter(
+            Reserva.sala_id == sala_filtro.id
         )
 
     reservas = consulta.order_by(
@@ -1190,8 +1262,20 @@ def agenda():
 
     return render_template(
         "agenda.html",
+
         reservas=reservas,
+
         data_filtro=data_str,
+
+        salas=salas,
+
+        sala_filtro=sala_filtro,
+
+        sala_id_filtro=(
+            sala_filtro.id
+            if sala_filtro
+            else ""
+        ),
 
         mes_atual=mes_data.strftime(
             "%Y-%m"
