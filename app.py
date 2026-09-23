@@ -1365,9 +1365,32 @@ def admin():
         Reserva.hora_inicio.asc()
     ).all()
 
+    usuarios = User.query.order_by(
+        User.username.asc()
+    ).all()
+
     return render_template(
         "admin.html",
-        reservas=reservas
+        reservas=reservas,
+        usuarios=usuarios
+    )
+
+
+# ============================================================
+# USUÁRIOS CADASTRADOS
+# ============================================================
+
+@app.route("/usuarios")
+@admin_required
+def usuarios():
+
+    usuarios = User.query.order_by(
+        User.username.asc()
+    ).all()
+
+    return render_template(
+        "usuarios.html",
+        usuarios=usuarios
     )
 
 
