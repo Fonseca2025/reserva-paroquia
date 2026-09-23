@@ -476,8 +476,19 @@ def setup_db():
 @app.route("/")
 def index():
 
+    minhas_reservas = []
+
+    if current_user.is_authenticated and not current_user.is_admin:
+        minhas_reservas = Reserva.query.filter_by(
+            usuario_id=current_user.id
+        ).order_by(
+            Reserva.data.asc(),
+            Reserva.hora_inicio.asc()
+        ).all()
+
     return render_template(
-        "index.html"
+        "index.html",
+        minhas_reservas=minhas_reservas
     )
 
 
