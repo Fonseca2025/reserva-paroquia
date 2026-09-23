@@ -1,32 +1,1154 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
+
 <head>
-    <title>SJT Reservas</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Agenda de Reservas</title>
+
     <style>
-        :root { --verde: #1b4d3e; --vinho: #7a1b1b; }
-        .navbar { background: var(--verde) !important; border-bottom: 4px solid var(--vinho); }
-        .btn-primary { background: var(--vinho) !important; border: none; }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f4f6f8;
+            color: #333;
+        }
+
+        .container {
+            width: 95%;
+            max-width: 1400px;
+            margin: 25px auto;
+        }
+
+        /* ================================================= */
+        /* CABEÇALHO */
+        /* ================================================= */
+
+        .topo {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 20px;
+
+            margin-bottom: 20px;
+
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .topo h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+
+        .topo p {
+            margin: 6px 0 0;
+            color: #666;
+        }
+
+        .botoes-topo {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-block;
+
+            border: none;
+            border-radius: 7px;
+
+            padding: 10px 16px;
+
+            text-decoration: none;
+
+            cursor: pointer;
+
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .btn:hover {
+            opacity: 0.88;
+        }
+
+        .btn-admin {
+            background: #343a40;
+            color: white;
+        }
+
+        .btn-sair {
+            background: #6c757d;
+            color: white;
+        }
+
+
+        /* ================================================= */
+        /* FILTROS */
+        /* ================================================= */
+
+        .card {
+            background: #ffffff;
+
+            border-radius: 12px;
+
+            padding: 20px;
+
+            margin-bottom: 20px;
+
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .card h2 {
+            margin-top: 0;
+        }
+
+        .filtros {
+            display: grid;
+
+            grid-template-columns:
+                repeat(auto-fit, minmax(220px, 1fr));
+
+            gap: 15px;
+
+            align-items: end;
+        }
+
+        .campo {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .campo label {
+            font-weight: bold;
+            margin-bottom: 6px;
+            font-size: 14px;
+        }
+
+        .campo input,
+        .campo select {
+            width: 100%;
+
+            padding: 10px;
+
+            border: 1px solid #ccc;
+
+            border-radius: 7px;
+
+            background: white;
+
+            font-size: 14px;
+        }
+
+        .campo input:focus,
+        .campo select:focus {
+            outline: none;
+
+            border-color: #777;
+
+            box-shadow:
+                0 0 0 2px rgba(0, 0, 0, 0.08);
+        }
+
+        .botoes-filtro {
+            display: flex;
+
+            gap: 8px;
+
+            flex-wrap: wrap;
+        }
+
+        .btn-filtrar {
+            background: #198754;
+            color: white;
+        }
+
+        .btn-limpar {
+            background: #6c757d;
+            color: white;
+        }
+
+
+        /* ================================================= */
+        /* ALERTAS DOS FILTROS */
+        /* ================================================= */
+
+        .filtros-ativos {
+            margin-top: 15px;
+
+            padding: 12px 15px;
+
+            background: #e9f2ff;
+
+            border: 1px solid #cfe2ff;
+
+            border-radius: 8px;
+
+            color: #084298;
+
+            font-size: 14px;
+        }
+
+
+        /* ================================================= */
+        /* CALENDÁRIO */
+        /* ================================================= */
+
+        .calendario-card {
+            background: #ffffff;
+
+            border-radius: 12px;
+
+            padding: 20px;
+
+            margin-bottom: 20px;
+
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .calendario-topo {
+            display: flex;
+
+            justify-content: space-between;
+
+            align-items: center;
+
+            gap: 10px;
+
+            margin-bottom: 15px;
+
+            flex-wrap: wrap;
+        }
+
+        .calendario-topo h2 {
+            margin: 0;
+
+            text-transform: capitalize;
+        }
+
+        .navegacao-mes {
+            display: flex;
+
+            gap: 8px;
+
+            flex-wrap: wrap;
+        }
+
+        .btn-mes {
+            display: inline-block;
+
+            padding: 8px 12px;
+
+            background: #343a40;
+
+            color: white;
+
+            border-radius: 6px;
+
+            text-decoration: none;
+
+            font-size: 13px;
+
+            font-weight: bold;
+        }
+
+        .btn-hoje {
+            background: #198754;
+        }
+
+        .calendario {
+            display: grid;
+
+            grid-template-columns:
+                repeat(7, 1fr);
+
+            gap: 5px;
+        }
+
+        .dia-semana {
+            text-align: center;
+
+            font-weight: bold;
+
+            padding: 8px 3px;
+
+            background: #343a40;
+
+            color: white;
+
+            font-size: 13px;
+
+            border-radius: 4px;
+        }
+
+        .dia-vazio {
+            min-height: 55px;
+        }
+
+        .dia {
+            min-height: 55px;
+
+            border: 1px solid #e1e1e1;
+
+            border-radius: 6px;
+
+            background: #fafafa;
+
+            text-decoration: none;
+
+            color: #333;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            font-weight: bold;
+
+            position: relative;
+        }
+
+        .dia:hover {
+            background: #eeeeee;
+        }
+
+        .dia.com-reserva {
+            background: #e9f2ff;
+
+            border-color: #9ec5fe;
+
+            color: #084298;
+        }
+
+        .dia.selecionado {
+            outline: 3px solid #198754;
+
+            outline-offset: -3px;
+        }
+
+        .ponto-reserva {
+            width: 7px;
+
+            height: 7px;
+
+            background: #198754;
+
+            border-radius: 50%;
+
+            position: absolute;
+
+            bottom: 6px;
+        }
+
+
+        /* ================================================= */
+        /* TABELA */
+        /* ================================================= */
+
+        .tabela-card {
+            background: #ffffff;
+
+            border-radius: 12px;
+
+            padding: 20px;
+
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .tabela-cabecalho {
+            display: flex;
+
+            justify-content: space-between;
+
+            align-items: center;
+
+            gap: 15px;
+
+            flex-wrap: wrap;
+
+            margin-bottom: 15px;
+        }
+
+        .tabela-cabecalho h2 {
+            margin: 0;
+        }
+
+        .legenda {
+            display: flex;
+
+            gap: 8px;
+
+            flex-wrap: wrap;
+        }
+
+        .status {
+            display: inline-block;
+
+            padding: 7px 12px;
+
+            border-radius: 20px;
+
+            font-size: 12px;
+
+            font-weight: bold;
+
+            white-space: nowrap;
+        }
+
+        .status-pendente {
+            background: #fff3cd;
+
+            color: #664d03;
+
+            border: 1px solid #ffecb5;
+        }
+
+        .status-aprovado {
+            background: #d1e7dd;
+
+            color: #0f5132;
+
+            border: 1px solid #badbcc;
+        }
+
+        .status-reprovado {
+            background: #f8d7da;
+
+            color: #842029;
+
+            border: 1px solid #f5c2c7;
+        }
+
+        .status-outro {
+            background: #e2e3e5;
+
+            color: #41464b;
+
+            border: 1px solid #d3d6d8;
+        }
+
+        .tabela-container {
+            width: 100%;
+
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+
+            border-collapse: collapse;
+
+            min-width: 950px;
+        }
+
+        th {
+            background: #343a40;
+
+            color: white;
+
+            padding: 12px 10px;
+
+            text-align: left;
+
+            font-size: 14px;
+        }
+
+        td {
+            padding: 12px 10px;
+
+            border-bottom: 1px solid #e5e5e5;
+
+            vertical-align: top;
+
+            font-size: 14px;
+        }
+
+        tr:hover td {
+            background: #fafafa;
+        }
+
+        .observacao {
+            max-width: 280px;
+
+            line-height: 1.4;
+        }
+
+        .motivo {
+            max-width: 280px;
+
+            line-height: 1.4;
+
+            color: #842029;
+        }
+
+        .sem-informacao {
+            color: #999;
+
+            font-style: italic;
+        }
+
+        .quantidade {
+            text-align: center;
+
+            font-weight: bold;
+        }
+
+        .sem-reservas {
+            text-align: center;
+
+            padding: 40px 20px;
+
+            color: #777;
+        }
+
+
+        /* ================================================= */
+        /* RESPONSIVO */
+        /* ================================================= */
+
+        @media (max-width: 768px) {
+
+            .container {
+                width: 97%;
+
+                margin: 15px auto;
+            }
+
+            .topo {
+                padding: 16px;
+            }
+
+            .topo h1 {
+                font-size: 23px;
+            }
+
+            .card,
+            .calendario-card,
+            .tabela-card {
+                padding: 15px;
+            }
+
+            .calendario {
+                gap: 3px;
+            }
+
+            .dia {
+                min-height: 45px;
+
+                font-size: 12px;
+            }
+
+            .dia-semana {
+                font-size: 11px;
+            }
+
+            table {
+                min-width: 900px;
+            }
+        }
+
     </style>
+
 </head>
+
+
 <body>
-    <nav class="navbar navbar-dark mb-4">
-        <div class="container">
-            <a class="navbar-brand" href="/">São Judas Tadeu - MOC</a>
-            <div>
-                {% if current_user.is_authenticated %}
-                    <a href="/logout" class="btn btn-sm btn-outline-light">Sair</a>
-                {% endif %}
-            </div>
+
+<div class="container">
+
+
+    <!-- ================================================= -->
+    <!-- CABEÇALHO -->
+    <!-- ================================================= -->
+
+    <div class="topo">
+
+        <div>
+
+            <h1>
+                Agenda de Reservas
+            </h1>
+
+            <p>
+                Visualização das reservas dos espaços
+                da Paróquia São Judas Tadeu.
+            </p>
+
         </div>
-    </nav>
-    <div class="container">
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}{% for m in messages %}
-                <div class="alert alert-info">{{ m|safe }}</div>
-            {% endfor %}{% endif %}
-        {% endwith %}
-        {% block content %}{% endblock %}
+
+
+        <div class="botoes-topo">
+
+            <a
+                href="{{ url_for('admin') }}"
+                class="btn btn-admin"
+            >
+                Administração
+            </a>
+
+            <a
+                href="{{ url_for('logout') }}"
+                class="btn btn-sair"
+            >
+                Sair
+            </a>
+
+        </div>
+
     </div>
+
+
+    <!-- ================================================= -->
+    <!-- FILTROS -->
+    <!-- ================================================= -->
+
+    <div class="card">
+
+        <h2>
+            Filtros
+        </h2>
+
+        <form
+            method="GET"
+            action="{{ url_for('agenda') }}"
+        >
+
+            <div class="filtros">
+
+
+                <!-- DATA -->
+
+                <div class="campo">
+
+                    <label for="data">
+                        Filtrar por data
+                    </label>
+
+                    <input
+                        type="date"
+                        id="data"
+                        name="data"
+                        value="{% if data_filtro %}{{ data_filtro.strftime('%Y-%m-%d') }}{% endif %}"
+                    >
+
+                </div>
+
+
+                <!-- SALA -->
+
+                <div class="campo">
+
+                    <label for="sala_id">
+                        Filtrar por sala
+                    </label>
+
+                    <select
+                        id="sala_id"
+                        name="sala_id"
+                    >
+
+                        <option value="">
+                            Todas as salas
+                        </option>
+
+                        {% for sala in salas %}
+
+                            <option
+                                value="{{ sala.id }}"
+                                {% if sala_id_filtro == sala.id %}
+                                    selected
+                                {% endif %}
+                            >
+                                {{ sala.nome }}
+                            </option>
+
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+
+                <!-- BOTÕES -->
+
+                <div class="botoes-filtro">
+
+                    <button
+                        type="submit"
+                        class="btn btn-filtrar"
+                    >
+                        Filtrar
+                    </button>
+
+                    <a
+                        href="{{ url_for('agenda') }}"
+                        class="btn btn-limpar"
+                    >
+                        Limpar filtros
+                    </a>
+
+                </div>
+
+            </div>
+
+        </form>
+
+
+        <!-- FILTROS ATIVOS -->
+
+        {% if data_filtro or sala_filtro %}
+
+            <div class="filtros-ativos">
+
+                <strong>
+                    Filtros ativos:
+                </strong>
+
+                {% if data_filtro %}
+
+                    Data:
+                    {{ data_filtro.strftime('%d/%m/%Y') }}
+
+                {% endif %}
+
+                {% if data_filtro and sala_filtro %}
+
+                    |
+
+                {% endif %}
+
+                {% if sala_filtro %}
+
+                    Sala:
+                    {{ sala_filtro.nome }}
+
+                {% endif %}
+
+            </div>
+
+        {% endif %}
+
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- CALENDÁRIO -->
+    <!-- ================================================= -->
+
+    <div class="calendario-card">
+
+        <div class="calendario-topo">
+
+            <h2>
+                {{ primeiro_dia_mes.strftime('%B de %Y') }}
+            </h2>
+
+
+            <div class="navegacao-mes">
+
+                <a
+                    href="{{ url_for(
+                        'agenda',
+                        mes=mes_anterior.strftime('%Y-%m'),
+                        sala_id=sala_id_filtro
+                    ) }}"
+                    class="btn-mes"
+                >
+                    ‹ Mês anterior
+                </a>
+
+
+                <a
+                    href="{{ url_for(
+                        'agenda',
+                        mes=proximo_mes.strftime('%Y-%m'),
+                        sala_id=sala_id_filtro
+                    ) }}"
+                    class="btn-mes"
+                >
+                    Próximo mês ›
+                </a>
+
+
+                <a
+                    href="{{ url_for(
+                        'agenda',
+                        sala_id=sala_id_filtro
+                    ) }}"
+                    class="btn-mes btn-hoje"
+                >
+                    Hoje
+                </a>
+
+            </div>
+
+        </div>
+
+
+        <div class="calendario">
+
+
+            <!-- DIAS DA SEMANA -->
+
+            <div class="dia-semana">
+                Dom
+            </div>
+
+            <div class="dia-semana">
+                Seg
+            </div>
+
+            <div class="dia-semana">
+                Ter
+            </div>
+
+            <div class="dia-semana">
+                Qua
+            </div>
+
+            <div class="dia-semana">
+                Qui
+            </div>
+
+            <div class="dia-semana">
+                Sex
+            </div>
+
+            <div class="dia-semana">
+                Sáb
+            </div>
+
+
+            <!-- ESPAÇOS ANTES DO PRIMEIRO DIA -->
+
+            {% set primeiro_dia_semana =
+                (primeiro_dia_mes.weekday() + 1) % 7
+            %}
+
+            {% for i in range(primeiro_dia_semana) %}
+
+                <div class="dia-vazio"></div>
+
+            {% endfor %}
+
+
+            <!-- DIAS DO MÊS -->
+
+            {% set dias_no_mes =
+                (proximo_mes - primeiro_dia_mes).days
+            %}
+
+            {% for dia in range(1, dias_no_mes + 1) %}
+
+                {% set data_dia =
+                    primeiro_dia_mes.replace(day=dia)
+                %}
+
+                {% set tem_reserva =
+                    dia in dias_com_reserva
+                %}
+
+                <a
+                    href="{{ url_for(
+                        'agenda',
+                        data=data_dia.strftime('%Y-%m-%d'),
+                        sala_id=sala_id_filtro,
+                        mes=primeiro_dia_mes.strftime('%Y-%m')
+                    ) }}"
+                    class="dia
+                    {% if tem_reserva %}
+                        com-reserva
+                    {% endif %}
+                    {% if data_filtro == data_dia %}
+                        selecionado
+                    {% endif %}"
+                >
+
+                    {{ dia }}
+
+                    {% if tem_reserva %}
+
+                        <span
+                            class="ponto-reserva"
+                        ></span>
+
+                    {% endif %}
+
+                </a>
+
+            {% endfor %}
+
+        </div>
+
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- RESERVAS -->
+    <!-- ================================================= -->
+
+    <div class="tabela-card">
+
+
+        <div class="tabela-cabecalho">
+
+            <h2>
+                Reservas
+            </h2>
+
+
+            <div class="legenda">
+
+                <span class="status status-pendente">
+                    Pendente
+                </span>
+
+                <span class="status status-aprovado">
+                    Aprovado
+                </span>
+
+                <span class="status status-reprovado">
+                    Reprovado
+                </span>
+
+            </div>
+
+        </div>
+
+
+        {% if reservas %}
+
+            <div class="tabela-container">
+
+                <table>
+
+                    <thead>
+
+                        <tr>
+
+                            <th>
+                                Data
+                            </th>
+
+                            <th>
+                                Horário
+                            </th>
+
+                            <th>
+                                Sala
+                            </th>
+
+                            <th>
+                                Solicitante
+                            </th>
+
+                            <th>
+                                Pessoas
+                            </th>
+
+                            <th>
+                                Observação
+                            </th>
+
+                            <th>
+                                Status
+                            </th>
+
+                            <th>
+                                Motivo da reprovação
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+                        {% for reserva in reservas %}
+
+                            <tr>
+
+
+                                <!-- DATA -->
+
+                                <td>
+
+                                    {{ reserva.data.strftime('%d/%m/%Y') }}
+
+                                </td>
+
+
+                                <!-- HORÁRIO -->
+
+                                <td>
+
+                                    {{ reserva.hora_inicio }}
+                                    às
+                                    {{ reserva.hora_fim }}
+
+                                </td>
+
+
+                                <!-- SALA -->
+
+                                <td>
+
+                                    {{ reserva.sala.nome }}
+
+                                </td>
+
+
+                                <!-- SOLICITANTE -->
+
+                                <td>
+
+                                    <strong>
+                                        {{ reserva.usuario.username }}
+                                    </strong>
+
+                                    <br>
+
+                                    <small>
+                                        {{ reserva.usuario.email }}
+                                    </small>
+
+                                </td>
+
+
+                                <!-- PESSOAS -->
+
+                                <td class="quantidade">
+
+                                    {{ reserva.qtd_pessoas }}
+
+                                </td>
+
+
+                                <!-- OBSERVAÇÃO -->
+
+                                <td>
+
+                                    {% if reserva.observacao %}
+
+                                        <div class="observacao">
+                                            {{ reserva.observacao }}
+                                        </div>
+
+                                    {% else %}
+
+                                        <span class="sem-informacao">
+                                            Sem observação
+                                        </span>
+
+                                    {% endif %}
+
+                                </td>
+
+
+                                <!-- STATUS -->
+
+                                <td>
+
+                                    {% if reserva.status == "Pendente" %}
+
+                                        <span
+                                            class="status status-pendente"
+                                        >
+                                            Pendente
+                                        </span>
+
+                                    {% elif reserva.status == "Aprovado" %}
+
+                                        <span
+                                            class="status status-aprovado"
+                                        >
+                                            Aprovado
+                                        </span>
+
+                                    {% elif reserva.status == "Reprovado" %}
+
+                                        <span
+                                            class="status status-reprovado"
+                                        >
+                                            Reprovado
+                                        </span>
+
+                                    {% else %}
+
+                                        <span
+                                            class="status status-outro"
+                                        >
+                                            {{ reserva.status }}
+                                        </span>
+
+                                    {% endif %}
+
+                                </td>
+
+
+                                <!-- MOTIVO DA REPROVAÇÃO -->
+
+                                <td>
+
+                                    {% if reserva.motivo_reprovacao %}
+
+                                        <div class="motivo">
+                                            {{ reserva.motivo_reprovacao }}
+                                        </div>
+
+                                    {% else %}
+
+                                        <span class="sem-informacao">
+                                            —
+                                        </span>
+
+                                    {% endif %}
+
+                                </td>
+
+
+                            </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        {% else %}
+
+            <div class="sem-reservas">
+
+                <p>
+                    Não há reservas para os filtros selecionados.
+                </p>
+
+            </div>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
 </body>
+
 </html>
